@@ -18,12 +18,14 @@ server.o: server.cpp server.h constants.h
 server-socket.o: server-socket.cpp server.h constants.h
 	g++ -g -std=c++0x -c server-socket.cpp
 
-client: client.o
-	g++ -g -std=c++0x -o client client.o -pthread
+client: client.o client-socket.o
+	g++ -g -std=c++0x -o client client.o client-socket.o -pthread
 
 client.o: client.cpp client.h constants.h
 	g++ -g -std=c++0x -c client.cpp
 
+client-socket.o: client-socket.cpp client.h constants.h
+	g++ -g -std=c++0x -c client-socket.cpp
 
 clean:
 	rm -f *.o master server client

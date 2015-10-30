@@ -138,6 +138,9 @@ bool Server::ReadPortsFile() {
 
 /**
  * initialize data members and resize vectors
+ * @param  pid process's self id
+ * @param  num_servers number of servers
+ * @param  num_clients number of clients
  */
 void Server::Initialize(const int pid,
                         const int num_servers,

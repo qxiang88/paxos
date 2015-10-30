@@ -202,14 +202,14 @@ bool Master::SpawnClients(const int n) {
     for (int i = 0; i < n; ++i) {
         char server_id_arg[10];
         char num_servers_arg[10];
-        // char num_clients_arg[10];
+        char num_clients_arg[10];
         sprintf(server_id_arg, "%d", i);
         sprintf(num_servers_arg, "%d", num_servers_);
-        // sprintf(num_clients_arg, "%d", num_clients_);
+        sprintf(num_clients_arg, "%d", num_clients_);
         char *argv[] = {(char*)kClientExecutable.c_str(),
                         server_id_arg,
                         num_servers_arg,
-                        // num_clients_arg,
+                        num_clients_arg,
                         NULL
                        };
         status = posix_spawn(&pid,
