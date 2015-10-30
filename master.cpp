@@ -8,6 +8,8 @@
 #include "cstring"
 #include "unistd.h"
 #include "spawn.h"
+#include "sys/types.h"
+#include "signal.h"
 using namespace std;
 
 extern char **environ;
@@ -30,6 +32,14 @@ int Master::get_server_listen_port(const int server_id) {
 
 int Master::get_client_listen_port(const int client_id) {
     return client_listen_port_[client_id];
+}
+
+int Master::get_server_pid(const int server_id) {
+    return server_pid_[server_id];
+}
+
+int Master::get_client_pid(const int client_id) {
+    return client_pid_[client_id];
 }
 
 void Master::set_server_pid(const int server_id, const int pid) {
@@ -60,12 +70,12 @@ bool Master::ReadPortsFile() {
         fin >> master_port_;
 
         int port;
-        for (int i = 0; i < num_servers; i++) {
+        for (int i = 0; i < num_servers_; i++) {
             fin >> port;
             server_listen_port_[i] = port;
         }
 
-        for (int i = 0; i < num_clients; i++) {
+        for (int i = 0; i < num_clients_; i++) {
             fin >> port;
             client_listen_port_[i] = port;
         }
@@ -89,13 +99,13 @@ void Master::ReadTest() {
         string keyword;
         iss >> keyword;
         if (keyword == kStart) {
-            iss >> num_servers >> num_clients;
+            iss >> num_servers_ >> num_clients_;
             Initialize();
             if (!ReadPortsFile())
                 return ;
-            if(!SpawnServers(num_servers))
+            if (!SpawnServers(num_servers_))
                 return;
-            if(!SpawnClients(num_clients))
+            if (!SpawnClients(num_clients_))
                 return;
         }
         if (keyword == kSendMessage) {
@@ -120,15 +130,15 @@ void Master::ReadTest() {
 }
 
 /**
- * initialize data members and resize vectors/maps
+ * initialize data members and resize vectors
  */
 void Master::Initialize() {
-    server_pid_.resize(num_servers);
-    client_pid_.resize(num_clients);
-    server_fd_.resize(num_servers, -1);
-    client_fd_.resize(num_clients, -1);
-    server_listen_port_.resize(num_servers);
-    client_listen_port_.resize(num_clients);
+    server_pid_.resize(num_servers_, -1);
+    client_pid_.resize(num_clients_, -1);
+    server_fd_.resize(num_servers_, -1);
+    client_fd_.resize(num_clients_, -1);
+    server_listen_port_.resize(num_servers_);
+    client_listen_port_.resize(num_clients_);
 }
 
 /**
@@ -140,19 +150,41 @@ bool Master::SpawnServers(const int n) {
     pid_t pid;
     int status;
     for (int i = 0; i < n; ++i) {
-        char *argv[] = {(char*)kServerExecutable.c_str(), (char*)to_string(i).c_str(), NULL};
-        status = posix_spawn(&pid, (char*)kServerExecutable.c_str(), NULL, NULL, argv, environ);
+        char server_id_arg[10];
+        char num_servers_arg[10];
+        char num_clients_arg[10];
+        sprintf(server_id_arg, "%d", i);
+        sprintf(num_servers_arg, "%d", num_servers_);
+        sprintf(num_clients_arg, "%d", num_clients_);
+        char *argv[] = {(char*)kServerExecutable.c_str(),
+                        server_id_arg,
+                        num_servers_arg,
+                        num_clients_arg,
+                        NULL
+                       };
+        status = posix_spawn(&pid,
+                             (char*)kServerExecutable.c_str(),
+                             NULL,
+                             NULL,
+                             argv,
+                             environ);
         if (status == 0) {
             cout << "M: Spawed server S" << i << endl;
             set_server_pid(i, pid);
-            if (ConnectToServer(i)) {
-                cout << "M: Connected to server S" << i << endl;
-            } else {
-                cout << "M: Error connecting to server S" << i << endl;
-                return false;
-            }
         } else {
-            cout << "M: Error spawing server S" << i << " error:" << strerror(status) << endl;
+            cout << "M: ERROR: Cannot spawn server S"
+                 << i << " - " << strerror(status) << endl;
+            return false;
+        }
+    }
+
+    // sleep for some time to make sure accept threads of servers are running
+    usleep(kGeneralSleep);
+    for (int i = 0; i < n; ++i) {
+        if (ConnectToServer(i)) {
+            cout << "M: Connected to server S" << i << endl;
+        } else {
+            cout << "M: ERROR: Cannot connect to server S" << i << endl;
             return false;
         }
     }
@@ -168,27 +200,100 @@ bool Master::SpawnClients(const int n) {
     pid_t pid;
     int status;
     for (int i = 0; i < n; ++i) {
-        char *argv[] = {(char*)kClientExecutable.c_str(), (char*)to_string(i).c_str(), NULL};
-        status = posix_spawn(&pid, (char*)kClientExecutable.c_str(), NULL, NULL, argv, environ);
+        char server_id_arg[10];
+        char num_servers_arg[10];
+        // char num_clients_arg[10];
+        sprintf(server_id_arg, "%d", i);
+        sprintf(num_servers_arg, "%d", num_servers_);
+        // sprintf(num_clients_arg, "%d", num_clients_);
+        char *argv[] = {(char*)kClientExecutable.c_str(),
+                        server_id_arg,
+                        num_servers_arg,
+                        // num_clients_arg,
+                        NULL
+                       };
+        status = posix_spawn(&pid,
+                             (char*)kClientExecutable.c_str(),
+                             NULL,
+                             NULL,
+                             argv,
+                             environ);
         if (status == 0) {
             cout << "M: Spawed client C" << i << endl;
             set_client_pid(i, pid);
-            if (ConnectToClient(i)) {
-                cout << "M: Connected to client C" << i << endl;
-            } else {
-                cout << "M: Error connecting to client C" << i << endl;
-                return false;
-            }
         } else {
-            cout << "M: Error spawing client C" << i << " error:" << strerror(status) << endl;
+            cout << "M: ERROR: Cannot spawn client C" << i << " - " << strerror(status) << endl;
+            return false;
+        }
+    }
+
+    // sleep for some time to make sure accept threads of clients are running
+    usleep(kGeneralSleep);
+    for (int i = 0; i < n; ++i) {
+        if (ConnectToClient(i)) {
+            cout << "M: Connected to client C" << i << endl;
+        } else {
+            cout << "M: ERROR: Cannot connect to client C" << i << endl;
             return false;
         }
     }
     return true;
 }
 
+/**
+ * kills the specified server. Set its pid and fd to -1
+ * @param server_id id of server to be killed
+ */
+void Master::CrashServer(const int server_id) {
+    int pid = get_server_pid(server_id);
+    if (pid != -1) {
+        // TODO: Think whether SIGKILL or SIGTERM
+        // TODO: If using SIGTERM, consider signal handling in server.cpp
+        kill(pid, SIGKILL);
+        set_server_pid(server_id, -1);
+        set_server_fd(server_id, -1);
+    }
+}
+
+/**
+ * kills the specified client. Set its pid and fd to -1
+ * @param client_id id of client to be killed
+ */
+void Master::CrashClient(const int client_id) {
+    int pid = get_client_pid(client_id);
+    if (pid != -1) {
+        // TODO: Think whether SIGKILL or SIGTERM
+        // TODO: If using SIGTERM, consider signal handling in client.cpp
+        kill(pid, SIGKILL);
+        set_client_pid(client_id, -1);
+        set_client_fd(client_id, -1);
+    }
+}
+
+/**
+ * kills all running servers
+ */
+void Master::KillAllServers() {
+    for (int i = 0; i < num_servers_; ++i) {
+        CrashServer(i);
+    }
+}
+
+/**
+ * kills all running clients
+ */
+void Master::KillAllClients() {
+    for (int i = 0; i < num_clients_; ++i) {
+        CrashClient(i);
+    }
+}
+
 int main() {
     Master M;
     M.ReadTest();
+
+
+    M.KillAllServers();
+    M.KillAllClients();
     return 0;
 }

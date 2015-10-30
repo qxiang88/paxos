@@ -1,4 +1,49 @@
 #ifndef SERVER_H_
 #define SERVER_H_
+#include "vector"
+#include "string"
+#include "map"
+using namespace std;
 
+class Server {
+public:
+    int get_pid();
+    int get_server_paxos_fd(const int server_id);
+    int get_client_chat_fd(const int client_id);
+    int get_master_port();
+    int get_server_listen_port(const int server_id);
+    int get_client_listen_port(const int client_id);
+
+    void set_server_paxos_fd(const int server_id, const int fd);
+    void set_client_chat_fd(const int client_id, const int fd);
+    void set_pid(const int pid);
+    void set_master_fd(const int fd);
+
+    void Initialize(const int pid,
+                            const int num_servers,
+                            const int num_clients);
+    int IsServerPaxosPort(const int port);
+    int IsClientChatPort(const int port);
+    void CreateThread(void* (*f)(void* ), void* arg, pthread_t &thread);
+    bool ReadPortsFile();
+
+
+private:
+    int pid_;   // server's ID
+    int num_servers_;
+    int num_clients_;
+
+    int master_fd_;
+    std::vector<int> server_paxos_fd_;
+    std::vector<int> client_chat_fd_;
+
+    int master_port_;   // port used by master for communication
+    std::vector<int> server_listen_port_;
+    std::vector<int> client_listen_port_;
+    std::vector<int> server_paxos_port_;
+    std::vector<int> client_chat_port_;
+    std::map<int, int> server_paxos_port_map_;
+    std::map<int, int> client_chat_port_map_;
+
+};
 #endif //SERVER_H_
