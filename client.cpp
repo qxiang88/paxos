@@ -5,9 +5,14 @@
 #include "string"
 #include "fstream"
 #include "sstream"
+#include "unistd.h"
+#include "signal.h"
+#include "errno.h"
+#include "sys/socket.h"
 using namespace std;
 
 extern void* AcceptConnections(void* _C);
+extern std::vector<string> split(const std::string &s, char delim);
 
 int Client::get_pid() {
     return pid_;
@@ -68,7 +73,7 @@ bool Client::ReadPortsFile() {
 
         for (int i = 0; i < num_clients_; i++) {
             fin >> port;
-            if(i == get_pid()) {
+            if (i == get_pid()) {
                 my_listen_port_ = port;
                 break;
             }
@@ -82,7 +87,7 @@ bool Client::ReadPortsFile() {
 
         for (int i = 0; i < num_clients_; i++) {
             fin >> port;
-            if(i == get_pid()) {
+            if (i == get_pid()) {
                 my_chat_port_ = port;
                 break;
             }
@@ -126,6 +131,38 @@ void Client::CreateThread(void* (*f)(void* ), void* arg, pthread_t &thread) {
     }
 }
 
+/**
+ * function for client's receive messages from master thread
+ * @param _C object of Client class
+ */
+void* ReceiveMessagesFromMaster(void* _C) {
+    Client* C = (Client*)_C;
+    char buf[kMaxDataSize];
+    int num_bytes;
+
+    while (true) {  // always listen to messages from the master
+
+        num_bytes = recv(C->get_master_fd(), buf, kMaxDataSize - 1, 0);
+        if (num_bytes == -1) {
+            cout << "C" << C->get_pid() << ": ERROR in receiving message from M" << endl;
+            return NULL;
+        } else if (num_bytes == 0) {    // connection closed by master
+            cout << "C" << C->get_pid() << ": Connection closed by Master. Exiting." << endl;
+            return NULL;
+        } else {
+            buf[num_bytes] = '\0';
+            // cout << "C" << C->get_pid() << ": Message received from M: " << buf <<  endl;
+            std::vector<string> tokens = split(string(buf), kMessageDelim[0]);
+            if (tokens[0] == kChat) {   // new chat message received from master
+                cout << "C" << C->get_pid() << ": Chat message received from M: " << tokens[1] <<  endl;
+            } else {    //other messages
+
+            }
+        }
+    }
+    return NULL;
+}
+
 int main(int argc, char *argv[]) {
     Client C;
     C.Initialize(atoi(argv[1]), atoi(argv[2]), atoi(argv[3]));
@@ -137,5 +174,10 @@ int main(int argc, char *argv[]) {
 
     void* status;
     pthread_join(accept_connections_thread, &status);
+
+    pthread_t receive_from_master_thread;
+    C.CreateThread(ReceiveMessagesFromMaster, (void*)&C, receive_from_master_thread);
+
+    pthread_join(receive_from_master_thread, &status);
     return 0;
 }

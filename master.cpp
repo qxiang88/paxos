@@ -10,6 +10,8 @@
 #include "spawn.h"
 #include "sys/types.h"
 #include "signal.h"
+#include "errno.h"
+#include "sys/socket.h"
 using namespace std;
 
 extern char **environ;
@@ -56,6 +58,36 @@ void Master::set_server_fd(const int server_id, const int fd) {
 
 void Master::set_client_fd(const int client_id, const int fd) {
     client_fd_[client_id] = fd;
+}
+
+/**
+ * extracts chat message from the sendMessage command
+ * @param command the sendMessage command given by user
+ * @param message [out] extracted chat message
+ */
+void Master::ExtractChatMessage(const string &command, string &message) {
+    int n = command.size();
+    int i = 0;
+    int spaces_count = 0;
+    while (i < n && spaces_count != 2) {
+        if (command[i] == ' ')
+            spaces_count++;
+        i++;
+    }
+    while (i < n) {
+        message.push_back(command[i]);
+        i++;
+    }
+}
+
+/**
+ * constructs the following templated message from the chat message body
+ * CHAT-<chat_message>
+ * @param chat_message body of chat message
+ * @param message      [out] templated message which can be sent
+ */
+void Master::ConstructChatMessage(const string &chat_message, string &message) {
+    message = kChat + kMessageDelim + chat_message;
 }
 
 /**
@@ -109,7 +141,13 @@ void Master::ReadTest() {
                 return;
         }
         if (keyword == kSendMessage) {
-
+            int client_id;
+            iss >> client_id;
+            string chat_message;
+            ExtractChatMessage(line, chat_message);
+            string message;
+            ConstructChatMessage(chat_message, message);
+            SendMessageToClient(client_id, message);
         }
         if (keyword == kCrashServer) {
 
@@ -288,11 +326,24 @@ void Master::KillAllClients() {
     }
 }
 
+/**
+ * sends message to a client
+ * @param client_id id of client to which message needs to be sent
+ * @param message   message to be sent
+ */
+void Master::SendMessageToClient(const int client_id, const string &message) {
+    if (send(get_client_fd(client_id), message.c_str(), message.size(), 0) == -1) {
+        cout << "M: ERROR: Cannot send message to client C" << client_id << endl;
+    } else {
+        cout << "M: Message sent to client C" << client_id << ": " << message << endl;
+    }
+}
+
 int main() {
     Master M;
     M.ReadTest();
 
-
+    usleep(5000 * 1000);
     M.KillAllServers();
     M.KillAllClients();
     return 0;

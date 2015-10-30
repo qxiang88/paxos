@@ -17,6 +17,9 @@ public:
     void KillAllClients();
     bool ConnectToServer(const int server_id);
     bool ConnectToClient(const int client_id);
+    void ExtractChatMessage(const string &command, string &message);
+    void ConstructChatMessage(const string &chat_message, string &message);
+    void SendMessageToClient(const int client_id, const string &message);
 
     int get_server_fd(const int server_id);
     int get_client_fd(const int client_id);

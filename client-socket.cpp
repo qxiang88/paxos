@@ -112,9 +112,10 @@ void* AcceptConnections(void* _C) {
 
         int incoming_port = ntohs(return_port_no((struct sockaddr *)&their_addr));
 
-        // client can get connect request only from master
+        // client can get connect request only from master, that too only once
         if (incoming_port == C->get_master_port()) { // incoming connection from master
             C->set_master_fd(new_fd);
+            pthread_exit(NULL);
         } else {
             cout << "C" << C->get_pid() << ": ERROR: Unexpected connect request from port "
                  << incoming_port << endl;

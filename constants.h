@@ -19,9 +19,13 @@ const string kAllClear = "allClear";
 const string kTimeBombLeader = "timeBombLeader";
 const string kPrintChatLog = "printChatLog";
 
-//cpp file paths
+// cpp file paths
 const string kServerExecutable = "./server";
 const string kClientExecutable = "./client";
+
+// message templates
+const string kMessageDelim = "-";
+const string kChat = "CHAT";
 
 // sleep values
 const time_t kGeneralSleep = 1000 * 1000;
