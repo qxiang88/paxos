@@ -1,7 +1,10 @@
 all: master server client
 
-master: master.cpp master.h constants.h
-	g++ -g -std=c++0x -o master master.cpp
+master: master.o socket.o
+	g++ -g -std=c++0x -o master master.o socket.o
+
+master.o: master.cpp master.h constants.h
+	g++ -g -std=c++0x -c master.cpp
 
 server: server.o
 	g++ -g -std=c++0x -o server server.o -pthread
@@ -15,5 +18,7 @@ client: client.o
 client.o: client.cpp client.h constants.h
 	g++ -g -std=c++0x -c client.cpp
 
+socket.o: socket.cpp master.h
+	g++ -g -std=c++0x -c socket.cpp
 clean:
 	rm -f *.o master server client

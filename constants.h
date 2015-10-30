@@ -1,3 +1,5 @@
+#ifndef CONSTANSTS_H_
+#define CONSTANSTS_H_
 #include "string"
 
 // filenames
@@ -15,3 +17,5 @@ string kPrintChatLog = "printChatLog";
 //cpp file paths
 string kServerExecutable = "./server";
 string kClientExecutable = "./client";
+
+#endif //CONSTANTS_H_
