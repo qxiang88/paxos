@@ -25,7 +25,7 @@ const string kClientExecutable = "./client";
 
 // message templates
 const string kMessageDelim = "$";
-const string kTagDelim = "-";
+const string kInternalDelim = "-";
 const string kChat = "CHAT";
 const string kChatLog = "CHATLOG";
 

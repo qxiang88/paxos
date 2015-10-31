@@ -104,7 +104,7 @@ void Master::ExtractChatMessage(const string &command, string &message) {
  * @param message      [out] templated message which can be sent
  */
 void Master::ConstructChatMessage(const string &chat_message, string &message) {
-    message = kChat + kTagDelim + chat_message + kMessageDelim;
+    message = kChat + kInternalDelim + chat_message + kMessageDelim;
 }
 
 /**
@@ -181,7 +181,7 @@ void Master::ReadTest() {
         if (keyword == kPrintChatLog) {
             int client_id;
             iss >> client_id;
-            string message = kChatLog + kTagDelim;
+            string message = kChatLog + kInternalDelim;
             SendMessageToClient(client_id, message);
             string chat_log;
             ReceiveChatLogFromClient(client_id, chat_log);

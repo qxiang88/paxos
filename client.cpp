@@ -148,7 +148,7 @@ void Client::Initialize(const int pid,
  * @param chat_message body of chat message
  */
 void Client::SendChatToLeader(const int chat_id, const string &chat_message) {
-    string msg = to_string(chat_id) + kTagDelim + chat_message + kMessageDelim;
+    string msg = to_string(chat_id) + kInternalDelim + chat_message + kMessageDelim;
     int leader_id = get_leader_id();
     if (send(get_leader_fd(), msg.c_str(), msg.size(), 0) == -1) {
         D(cout << "C" << get_pid() << ": ERROR: Cannot send chat message to leader S"
@@ -204,8 +204,8 @@ void Client::ConstructChatLogMessage(string &msg) {
     msg = "";
     // msg = to_string(final_chat_log_.size()) + kMessageDelim;
     for (auto const &c : final_chat_log_) {
-        msg += c.sequence_num + kTagDelim
-               + c.sender_index + kTagDelim 
+        msg += c.sequence_num + kInternalDelim
+               + c.sender_index + kInternalDelim 
                + c.body + kMessageDelim;
     }
 
@@ -260,7 +260,7 @@ void* ReceiveMessagesFromMaster(void* _C) {
             // extract multiple messages from the received buf
             std::vector<string> message = split(string(buf), kMessageDelim[0]);
             for (const auto &msg : message) {
-                std::vector<string> token = split(string(msg), kTagDelim[0]);
+                std::vector<string> token = split(string(msg), kInternalDelim[0]);
                 if (token[0] == kChat) {   // new chat message received from master
                     D(cout << "C" << C->get_pid() << ": Chat message received from M: " << token[1] <<  endl;)
                     C->AddChatToChatList(token[1]);
@@ -308,7 +308,7 @@ void* ReceiveMessagesFromLeader(void* _C) {
             // extract multiple messages from the received buf
             std::vector<string> message = split(string(buf), kMessageDelim[0]);
             for (const auto &msg : message) {
-                std::vector<string> token = split(string(msg), kTagDelim[0]);
+                std::vector<string> token = split(string(msg), kInternalDelim[0]);
                 // token[0] = sequence number of chat as assigned by Paxos
                 // token[1] = id of original sender of chat message
                 // token[2] = chat message body

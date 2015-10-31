@@ -231,7 +231,7 @@ void* ReceiveMessagesFromClient(void* _rcv_thread_arg) {
             // extract multiple messages from the received buf
             std::vector<string> message = split(string(buf), kMessageDelim[0]);
             for (const auto &msg : message) {
-                std::vector<string> token = split(string(msg), kTagDelim[0]);
+                std::vector<string> token = split(string(msg), kInternalDelim[0]);
                 // token[0] is chat_id
                 // token[1] is the chat message
             }
