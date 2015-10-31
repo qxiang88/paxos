@@ -11,6 +11,14 @@
 #include "sys/socket.h"
 using namespace std;
 
+#define DEBUG
+
+#ifdef DEBUG
+#  define D(x) x
+#else
+#  define D(x)
+#endif // DEBUG
+
 extern void* AcceptConnections(void* _S);
 extern std::vector<string> split(const std::string &s, char delim);
 extern void CreateThread(void* (*f)(void* ), void* arg, pthread_t &thread);
@@ -136,7 +144,7 @@ bool Server::ReadPortsFile() {
         return true;
 
     } catch (ifstream::failure e) {
-        cout << e.what() << endl;
+        D(cout << e.what() << endl;)
         if (fin.is_open()) fin.close();
         return false;
     }
@@ -170,7 +178,7 @@ void Server::Initialize(const int pid,
 void Server::ConnectToOtherServers() {
     for (int i = 0; i < get_pid(); ++i) {
         if (ConnectToServer(i)) {
-            cout << "S" << get_pid() << ": Connected to server S" << i << endl;
+            D(cout << "S" << get_pid() << ": Connected to server S" << i << endl;)
         } else {
             //TODO: Do we need to update something when a server realizes that
             // another server is dead?
@@ -210,22 +218,22 @@ void* ReceiveMessagesFromClient(void* _rcv_thread_arg) {
     while (true) {  // always listen to messages from the client
         num_bytes = recv(S->get_client_chat_fd(client_id), buf, kMaxDataSize - 1, 0);
         if (num_bytes == -1) {
-            cout << "S" << S->get_pid() << ": ERROR in receiving message from C"
-                 << client_id << endl;
+            D(cout << "S" << S->get_pid() << ": ERROR in receiving message from C"
+                 << client_id << endl;)
             return NULL;
         } else if (num_bytes == 0) {    // connection closed by client
-            cout << "S" << S->get_pid() << ": ERROR: Connection closed by Client." << endl;
+            D(cout << "S" << S->get_pid() << ": ERROR: Connection closed by Client." << endl;)
             return NULL;
         } else {
             buf[num_bytes] = '\0';
-            cout << "S" << S->get_pid() << ": Message received from C" << client_id << " - " << buf << endl;
+            D(cout << "S" << S->get_pid() << ": Message received from C" << client_id << " - " << buf << endl;)
 
             // extract multiple messages from the received buf
             std::vector<string> message = split(string(buf), kMessageDelim[0]);
             for (const auto &msg : message) {
-                std::vector<string> tokens = split(string(msg), kTagDelim[0]);
-                // tokens[0] is chat_id
-                // tokens[1] is the chat message
+                std::vector<string> token = split(string(msg), kTagDelim[0]);
+                // token[0] is chat_id
+                // token[1] is the chat message
             }
         }
     }

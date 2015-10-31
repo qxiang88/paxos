@@ -9,6 +9,16 @@ void* ReceiveMessagesFromClient(void* _rcv_thread_arg);
 
 class Server {
 public:
+    void Initialize(const int pid,
+                    const int num_servers,
+                    const int num_clients);
+    int IsServerPaxosPort(const int port);
+    int IsClientChatPort(const int port);
+    bool ReadPortsFile();
+    void CreateReceiveThreadsForClients();
+    bool ConnectToServer(const int server_id);
+    void ConnectToOtherServers();
+
     int get_pid();
     int get_server_paxos_fd(const int server_id);
     int get_client_chat_fd(const int client_id);
@@ -23,16 +33,6 @@ public:
     void set_pid(const int pid);
     void set_master_fd(const int fd);
     void set_leader_id(const int leader_id);
-
-    void Initialize(const int pid,
-                    const int num_servers,
-                    const int num_clients);
-    int IsServerPaxosPort(const int port);
-    int IsClientChatPort(const int port);
-    bool ReadPortsFile();
-    void CreateReceiveThreadsForClients();
-    bool ConnectToServer(const int server_id);
-    void ConnectToOtherServers();
 
 private:
     int pid_;   // server's ID

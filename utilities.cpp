@@ -4,6 +4,15 @@
 #include "iostream"
 using namespace std;
 
+#define DEBUG
+
+#ifdef DEBUG
+#  define D(x) x
+#else
+#  define D(x)
+#endif // DEBUG
+
+
 std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
     std::stringstream ss(s);
     std::string item;
@@ -27,7 +36,7 @@ std::vector<std::string> split(const std::string &s, char delim) {
  */
 void CreateThread(void* (*f)(void* ), void* arg, pthread_t &thread) {
     if (pthread_create(&thread, NULL, f, arg)) {
-        cout << "U " << ": ERROR: Unable to create thread" << endl;
+        D(cout << "U " << ": ERROR: Unable to create thread" << endl;)
         pthread_exit(NULL);
     }
 }

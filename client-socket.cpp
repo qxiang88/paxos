@@ -13,6 +13,14 @@
 #include <signal.h>
 using namespace std;
 
+#define DEBUG
+
+#ifdef DEBUG
+#  define D(x) x
+#else
+#  define D(x)
+#endif // DEBUG
+
 /**
  * returns port number
  * @param  sa sockaddr structure
@@ -117,8 +125,8 @@ void* AcceptConnections(void* _C) {
             C->set_master_fd(new_fd);
             pthread_exit(NULL);
         } else {
-            cout << "C" << C->get_pid() << ": ERROR: Unexpected connect request from port "
-                 << incoming_port << endl;
+            D(cout << "C" << C->get_pid() << ": ERROR: Unexpected connect request from port "
+                 << incoming_port << endl;)
         }
     }
     pthread_exit(NULL);
@@ -158,6 +166,12 @@ bool Client::ConnectToLeader() {
 
         if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
                        sizeof(int)) == -1) {
+            perror("setsockopt ERROR");
+            exit(1);
+        }
+
+        if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&kReceiveTimeoutTimeval,
+                       sizeof(struct timeval)) == -1) {
             perror("setsockopt ERROR");
             exit(1);
         }

@@ -12,6 +12,14 @@
 #include <signal.h>
 using namespace std;
 
+#define DEBUG
+
+#ifdef DEBUG
+#  define D(x) x
+#else
+#  define D(x)
+#endif // DEBUG
+
 /**
  * returns port number
  * @param  sa sockaddr structure

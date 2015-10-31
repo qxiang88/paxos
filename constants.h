@@ -27,8 +27,15 @@ const string kClientExecutable = "./client";
 const string kMessageDelim = "$";
 const string kTagDelim = "-";
 const string kChat = "CHAT";
+const string kChatLog = "CHATLOG";
 
 // sleep values
 const time_t kGeneralSleep = 1000 * 1000;
+
+// timeout values
+const timeval kReceiveTimeoutTimeval = {
+    0, // tv_sec
+    500 * 1000 //tv_usec (microsec)
+};
 
 #endif //CONSTANTS_H_

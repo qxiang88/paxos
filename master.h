@@ -20,6 +20,8 @@ public:
     void ExtractChatMessage(const string &command, string &message);
     void ConstructChatMessage(const string &chat_message, string &message);
     void SendMessageToClient(const int client_id, const string &message);
+    void ReceiveChatLogFromClient(const int client_id, string &chat_log);
+    void PrintChatLog(const string &chat_log);
 
     int get_server_fd(const int server_id);
     int get_client_fd(const int client_id);

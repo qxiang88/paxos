@@ -1,7 +1,7 @@
 all: master server client
 
-master: master.o master-socket.o
-	g++ -g -std=c++0x -o master master.o master-socket.o
+master: master.o master-socket.o utilities.o
+	g++ -g -std=c++0x -o master master.o utilities.o master-socket.o -pthread
 
 master.o: master.cpp master.h constants.h
 	g++ -g -std=c++0x -c master.cpp

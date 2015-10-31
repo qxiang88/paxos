@@ -14,7 +14,16 @@
 #include "sys/socket.h"
 using namespace std;
 
+#define DEBUG
+
+#ifdef DEBUG
+#  define D(x) x
+#else
+#  define D(x)
+#endif // DEBUG
+
 extern char **environ;
+extern std::vector<string> split(const std::string &s, char delim);
 
 int Master::get_server_fd(const int server_id) {
     return server_fd_[server_id];
@@ -123,7 +132,7 @@ bool Master::ReadPortsFile() {
         return true;
 
     } catch (ifstream::failure e) {
-        cout << e.what() << endl;
+        D(cout << e.what() << endl;)
         if (fin.is_open()) fin.close();
         return false;
     }
@@ -170,8 +179,45 @@ void Master::ReadTest() {
 
         }
         if (keyword == kPrintChatLog) {
-
+            int client_id;
+            iss >> client_id;
+            string message = kChatLog + kTagDelim;
+            SendMessageToClient(client_id, message);
+            string chat_log;
+            ReceiveChatLogFromClient(client_id, chat_log);
+            PrintChatLog(chat_log);
         }
+    }
+}
+
+/**
+ * receives chatlog from a client
+ * @param client_id id of client from which chatlog is to be received
+ * @param chat_log  [out] chatlog received in concatenated string form
+ */
+void Master::ReceiveChatLogFromClient(const int client_id, string &chat_log) {
+    char buf[kMaxDataSize];
+    int num_bytes;
+    num_bytes = recv(get_client_fd(client_id), buf, kMaxDataSize - 1, 0);
+    if (num_bytes == -1) {
+        D(cout << "M: ERROR in receiving ChatLog from client C" << client_id << endl;)
+    } else if (num_bytes == 0) {    // connection closed by master
+        D(cout << "M: Connection closed by client C" << client_id << endl;)
+    } else {
+        buf[num_bytes] = '\0';
+        chat_log = string(buf);
+        // TODO: DOES NOT handle multiple chatlogs sent by the client in one go
+    }
+}
+
+/**
+ * prints chat log received from a client in the expected format
+ * @param chat_log chat log in concatenated string format
+ */
+void Master::PrintChatLog(const string &chat_log) {
+    std::vector<string> token = split(chat_log, kMessageDelim[0]);
+    for (int i=0; (i+2)<token.size(); i=i+3) {
+        cout<<token[i]<<" "<<token[i+1]<<": "<<token[i+2]<<endl;
     }
 }
 
@@ -216,11 +262,11 @@ bool Master::SpawnServers(const int n) {
                              argv,
                              environ);
         if (status == 0) {
-            cout << "M: Spawed server S" << i << endl;
+            D(cout << "M: Spawed server S" << i << endl;)
             set_server_pid(i, pid);
         } else {
-            cout << "M: ERROR: Cannot spawn server S"
-                 << i << " - " << strerror(status) << endl;
+            D(cout << "M: ERROR: Cannot spawn server S")
+                    << i << " - " << strerror(status) << endl;
             return false;
         }
     }
@@ -229,9 +275,9 @@ bool Master::SpawnServers(const int n) {
     usleep(kGeneralSleep);
     for (int i = 0; i < n; ++i) {
         if (ConnectToServer(i)) {
-            cout << "M: Connected to server S" << i << endl;
+            D(cout << "M: Connected to server S" << i << endl;)
         } else {
-            cout << "M: ERROR: Cannot connect to server S" << i << endl;
+            D(cout << "M: ERROR: Cannot connect to server S" << i << endl;)
             return false;
         }
     }
@@ -266,10 +312,10 @@ bool Master::SpawnClients(const int n) {
                              argv,
                              environ);
         if (status == 0) {
-            cout << "M: Spawed client C" << i << endl;
+            D(cout << "M: Spawed client C" << i << endl;)
             set_client_pid(i, pid);
         } else {
-            cout << "M: ERROR: Cannot spawn client C" << i << " - " << strerror(status) << endl;
+            D(cout << "M: ERROR: Cannot spawn client C" << i << " - " << strerror(status) << endl;)
             return false;
         }
     }
@@ -278,9 +324,9 @@ bool Master::SpawnClients(const int n) {
     usleep(kGeneralSleep);
     for (int i = 0; i < n; ++i) {
         if (ConnectToClient(i)) {
-            cout << "M: Connected to client C" << i << endl;
+            D(cout << "M: Connected to client C" << i << endl;)
         } else {
-            cout << "M: ERROR: Cannot connect to client C" << i << endl;
+            D(cout << "M: ERROR: Cannot connect to client C" << i << endl;)
             return false;
         }
     }
@@ -342,9 +388,9 @@ void Master::KillAllClients() {
  */
 void Master::SendMessageToClient(const int client_id, const string &message) {
     if (send(get_client_fd(client_id), message.c_str(), message.size(), 0) == -1) {
-        cout << "M: ERROR: Cannot send message to client C" << client_id << endl;
+        D(cout << "M: ERROR: Cannot send message to client C" << client_id << endl;)
     } else {
-        cout << "M: Message sent to client C" << client_id << ": " << message << endl;
+        D(cout << "M: Message sent to client C" << client_id << ": " << message << endl;)
     }
 }
 
