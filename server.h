@@ -5,6 +5,8 @@
 #include "map"
 using namespace std;
 
+void* ReceiveMessagesFromClient(void* _rcv_thread_arg);
+
 class Server {
 public:
     int get_pid();
@@ -13,25 +15,30 @@ public:
     int get_master_port();
     int get_server_listen_port(const int server_id);
     int get_client_listen_port(const int client_id);
+    int get_server_paxos_port(const int server_id);
+    int get_leader_id();
 
     void set_server_paxos_fd(const int server_id, const int fd);
     void set_client_chat_fd(const int client_id, const int fd);
     void set_pid(const int pid);
     void set_master_fd(const int fd);
+    void set_leader_id(const int leader_id);
 
     void Initialize(const int pid,
-                            const int num_servers,
-                            const int num_clients);
+                    const int num_servers,
+                    const int num_clients);
     int IsServerPaxosPort(const int port);
     int IsClientChatPort(const int port);
-    void CreateThread(void* (*f)(void* ), void* arg, pthread_t &thread);
     bool ReadPortsFile();
-
+    void CreateReceiveThreadsForClients();
+    bool ConnectToServer(const int server_id);
+    void ConnectToOtherServers();
 
 private:
     int pid_;   // server's ID
     int num_servers_;
     int num_clients_;
+    int leader_id_;
 
     int master_fd_;
     std::vector<int> server_paxos_fd_;
@@ -46,4 +53,10 @@ private:
     std::map<int, int> client_chat_port_map_;
 
 };
+
+struct ReceiveThreadArgument {
+    Server *S;
+    int client_id;
+};
+
 #endif //SERVER_H_

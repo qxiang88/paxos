@@ -28,15 +28,18 @@ public:
     int get_client_listen_port(const int client_id);
     int get_server_pid(const int server_id);
     int get_client_pid(const int client_id);
+    int get_leader_id();
 
     void set_server_pid(const int server_id, const int pid);
     void set_client_pid(const int client_id, const int pid);
     void set_server_fd(const int server_id, const int fd);
     void set_client_fd(const int client_id, const int fd);
+    void set_leader_id(const int leader_id);
 
 private:
     int num_servers_;
     int num_clients_;
+    int leader_id_;
 
     std::vector<int> server_pid_;
     std::vector<int> client_pid_;

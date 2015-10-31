@@ -9,8 +9,8 @@ master.o: master.cpp master.h constants.h
 master-socket.o: master-socket.cpp master.h
 	g++ -g -std=c++0x -c master-socket.cpp
 
-server: server.o server-socket.o
-	g++ -g -std=c++0x -o server server.o server-socket.o -pthread
+server: server.o server-socket.o utilities.o
+	g++ -g -std=c++0x -o server server.o server-socket.o utilities.o -pthread
 
 server.o: server.cpp server.h constants.h
 	g++ -g -std=c++0x -c server.cpp

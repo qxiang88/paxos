@@ -24,7 +24,8 @@ const string kServerExecutable = "./server";
 const string kClientExecutable = "./client";
 
 // message templates
-const string kMessageDelim = "-";
+const string kMessageDelim = "$";
+const string kTagDelim = "-";
 const string kChat = "CHAT";
 
 // sleep values

@@ -44,6 +44,10 @@ int Master::get_client_pid(const int client_id) {
     return client_pid_[client_id];
 }
 
+int Master::get_leader_id() {
+    return leader_id_;
+}
+
 void Master::set_server_pid(const int server_id, const int pid) {
     server_pid_[server_id] = pid;
 }
@@ -58,6 +62,10 @@ void Master::set_server_fd(const int server_id, const int fd) {
 
 void Master::set_client_fd(const int client_id, const int fd) {
     client_fd_[client_id] = fd;
+}
+
+void Master::set_leader_id(const int leader_id) {
+    leader_id_ = leader_id;
 }
 
 /**
@@ -87,7 +95,7 @@ void Master::ExtractChatMessage(const string &command, string &message) {
  * @param message      [out] templated message which can be sent
  */
 void Master::ConstructChatMessage(const string &chat_message, string &message) {
-    message = kChat + kMessageDelim + chat_message;
+    message = kChat + kTagDelim + chat_message + kMessageDelim;
 }
 
 /**
@@ -171,6 +179,7 @@ void Master::ReadTest() {
  * initialize data members and resize vectors
  */
 void Master::Initialize() {
+    set_leader_id(0);
     server_pid_.resize(num_servers_, -1);
     client_pid_.resize(num_clients_, -1);
     server_fd_.resize(num_servers_, -1);
@@ -343,7 +352,7 @@ int main() {
     Master M;
     M.ReadTest();
 
-    usleep(5000 * 1000);
+    usleep(10000 * 1000);
     M.KillAllServers();
     M.KillAllClients();
     return 0;

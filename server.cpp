@@ -5,9 +5,15 @@
 #include "string"
 #include "fstream"
 #include "sstream"
+#include "unistd.h"
+#include "signal.h"
+#include "errno.h"
+#include "sys/socket.h"
 using namespace std;
 
 extern void* AcceptConnections(void* _S);
+extern std::vector<string> split(const std::string &s, char delim);
+extern void CreateThread(void* (*f)(void* ), void* arg, pthread_t &thread);
 
 int Server::get_pid() {
     return pid_;
@@ -33,14 +39,23 @@ int Server::get_client_listen_port(const int client_id) {
     return client_listen_port_[client_id];
 }
 
+int Server::get_server_paxos_port(const int server_id) {
+    return server_paxos_port_[server_id];
+}
+
+int Server::get_leader_id() {
+    return leader_id_;
+}
+
 void Server::set_server_paxos_fd(const int server_id, const int fd) {
-    if (fd == -1 || server_paxos_fd_[server_id] != -1)
+    if (fd == -1 || server_paxos_fd_[server_id] == -1)
         server_paxos_fd_[server_id] = fd;
 }
 
 void Server::set_client_chat_fd(const int client_id, const int fd) {
-    if (fd == -1 || client_chat_fd_[client_id] != -1)
+    if (fd == -1 || client_chat_fd_[client_id] == -1) {
         client_chat_fd_[client_id] = fd;
+    }
 }
 
 void Server::set_pid(const int pid) {
@@ -49,6 +64,10 @@ void Server::set_pid(const int pid) {
 
 void Server::set_master_fd(const int fd) {
     master_fd_ = fd;
+}
+
+void Server::set_leader_id(const int leader_id) {
+    leader_id_ = leader_id;
 }
 
 /**
@@ -76,19 +95,6 @@ int Server::IsClientChatPort(const int port) {
         return client_chat_port_map_[port];
     } else {
         return -1;
-    }
-}
-
-/**
- * creates a new thread
- * @param  f function pointer to be passed to the new thread
- * @param  arg arguments for the function f passed to the thread
- * @param  thread thread identifier for new thread
- */
-void Server::CreateThread(void* (*f)(void* ), void* arg, pthread_t &thread) {
-    if (pthread_create(&thread, NULL, f, arg)) {
-        cout << "S" << get_pid() << ": ERROR: Unable to create thread" << endl;
-        pthread_exit(NULL);
     }
 }
 
@@ -146,6 +152,7 @@ void Server::Initialize(const int pid,
                         const int num_servers,
                         const int num_clients) {
     set_pid(pid);
+    set_leader_id(0);
     num_servers_ = num_servers;
     num_clients_ = num_clients;
     server_paxos_fd_.resize(num_servers_, -1);
@@ -156,6 +163,75 @@ void Server::Initialize(const int pid,
     client_chat_port_.resize(num_clients_);
 }
 
+/**
+ * connects to all servers whose id is less than self
+ * this logic makes sure that a pair is connected only once
+ */
+void Server::ConnectToOtherServers() {
+    for (int i = 0; i < get_pid(); ++i) {
+        if (ConnectToServer(i)) {
+            cout << "S" << get_pid() << ": Connected to server S" << i << endl;
+        } else {
+            //TODO: Do we need to update something when a server realizes that
+            // another server is dead?
+        }
+    }
+}
+
+/**
+ * creates threads for receiving messages from clients
+ */
+void Server::CreateReceiveThreadsForClients() {
+    std::vector<pthread_t> receive_from_client_thread(num_clients_);
+
+    ReceiveThreadArgument **rcv_thread_arg = new ReceiveThreadArgument*[num_clients_];
+    for (int i = 0; i < num_clients_; i++) {
+        rcv_thread_arg[i] = new ReceiveThreadArgument;
+        rcv_thread_arg[i]->S = this;
+        rcv_thread_arg[i]->client_id = i;
+        CreateThread(ReceiveMessagesFromClient,
+                     (void *)rcv_thread_arg[i],
+                     receive_from_client_thread[i]);
+    }
+}
+
+/**
+ * function for the thread receiving messages from a client with id=client_id
+ * @param _rcv_thread_arg argument containing server object and client_id 
+ */
+void* ReceiveMessagesFromClient(void* _rcv_thread_arg) {
+    ReceiveThreadArgument *rcv_thread_arg = (ReceiveThreadArgument *)_rcv_thread_arg;
+    Server *S = rcv_thread_arg->S;
+    int client_id = rcv_thread_arg->client_id;
+
+    char buf[kMaxDataSize];
+    int num_bytes;
+
+    while (true) {  // always listen to messages from the client
+        num_bytes = recv(S->get_client_chat_fd(client_id), buf, kMaxDataSize - 1, 0);
+        if (num_bytes == -1) {
+            cout << "S" << S->get_pid() << ": ERROR in receiving message from C"
+                 << client_id << endl;
+            return NULL;
+        } else if (num_bytes == 0) {    // connection closed by client
+            cout << "S" << S->get_pid() << ": ERROR: Connection closed by Client." << endl;
+            return NULL;
+        } else {
+            buf[num_bytes] = '\0';
+            cout << "S" << S->get_pid() << ": Message received from C" << client_id << " - " << buf << endl;
+
+            // extract multiple messages from the received buf
+            std::vector<string> message = split(string(buf), kMessageDelim[0]);
+            for (const auto &msg : message) {
+                std::vector<string> tokens = split(string(msg), kTagDelim[0]);
+                // tokens[0] is chat_id
+                // tokens[1] is the chat message
+            }
+        }
+    }
+    return NULL;
+}
+
 int main(int argc, char *argv[]) {
     Server S;
     S.Initialize(atoi(argv[1]), atoi(argv[2]), atoi(argv[3]));
@@ -163,7 +239,19 @@ int main(int argc, char *argv[]) {
         return 1;
 
     pthread_t accept_connections_thread;
-    S.CreateThread(AcceptConnections, (void*)&S, accept_connections_thread);
+    CreateThread(AcceptConnections, (void*)&S, accept_connections_thread);
+
+    // sleep for some time to make sure accept threads of all servers are running
+    usleep(kGeneralSleep);
+    S.ConnectToOtherServers();
+
+    // sleep for some time to make sure all connections are established
+    usleep(kGeneralSleep);
+    usleep(kGeneralSleep);
+    usleep(kGeneralSleep);
+    if (S.get_pid() == S.get_leader_id()) {
+        S.CreateReceiveThreadsForClients();
+    }
 
     void* status;
     pthread_join(accept_connections_thread, &status);
