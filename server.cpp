@@ -262,22 +262,27 @@ void Server::SendToServers(const string& type, const string& msg)
     }
 }
 
-
-void Server::SendToLeader(const string&msg)
+void Server::Unicast(const string &type, const string& msg)
 {
-    int serv_fd = get_leader_fd(get_pid());
+    if(type==kPreEmpted || type==kAdopted)
+        serv_fd = get_leader_fd(get_pid());
+    else if(type==kP2b)
+        serv_fd = get_commander_fd(get_pid());
+    else if(type==kP1b)
+        serv_fd = get_scout_fd(get_pid());
+
     if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
-        D(cout << ": ERROR: sending to leader" << endl;)
+        D(cout << ": ERROR: sending "<<type<< endl;)
     }
     else {
-        D(cout << ": Msg sent to leader" << endl;)
+        D(cout << ": "<< type<< "Msg sent"<<endl;)
     }
 }
 
 void Server::SendPreEmpted(const Ballot& b)
 {
     string msg = kPreEmpted + kInternalDelim + ballotToString(b) + kMessageDelim;
-    SendToLeader(msg);
+    Unicast(kPreEmpted, msg);
 }
 
 int main(int argc, char *argv[]) {

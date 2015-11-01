@@ -97,7 +97,8 @@ private:
 
     std::map<int, Proposal> proposals_;  // map of s,Proposal
     std::map<int, Proposal> decisions_;
-
+    std::unordered_set<Triple> accepted_;
+    
     int master_fd_;
     std::vector<int> commander_fd_;
     std::vector<int> scout_fd_;

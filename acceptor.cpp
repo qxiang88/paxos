@@ -81,13 +81,103 @@ void *AcceptorEntry(void *_S) {
         return NULL;
     }
 }
+void Server::SendP1b(const Ballot& b, const unordered_set<Triple> &st)
+{
+    string msg = kP1b + kInternalDelim + to_string(get_pid());
+    msg += kInternalDelim + ballotToString(b) + kInternalDelim;
+    msg += tripleSetToString(st) + kMessageDelim;
+    Unicast(kP1b, msg);
+}
+
+void Server::SendP2b(const Ballot& b)
+{
+    string msg = kP2b + kInternalDelim + to_string(get_pid());
+    msg += kInternalDelim + ballotToString(b) + kMessageDelim;
+    Unicast(kP2b, msg);
+}
 
 void Server::Acceptor()
 {
+    accepted_.clear();
+    ballot_num_.id = INT_MIN;
+    ballot_num_.seq_num = INT_MIN;
 
+    char buf[kMaxDataSize];
+    int num_bytes;
+
+    fd_set subleaders, temp_set;
+    vector<int> fds;
+    int fd_max = INT_MIN, fd_temp;
+    FD_ZERO(&subleaders);
+
+    fd_temp = get_commander_fd(get_primary_id());
+    fd_max = max(fd_max, fd_temp);
+    fds.insert(fd_temp);
+    FD_SET(fd_temp, &subleaders);
+    fd_temp = get_scout_fd(get_primary_id());
+    fd_max = max(fd_max, fd_temp);
+    fds.insert(fd_temp);
+    FD_SET(fd_temp, &subleaders);
+    
+    while (true) {  // always listen to messages from the acceptors
+        temp_set = subleaders;
+        int rv = select(fd_max + 1, &temp_set, NULL, NULL, NULL);
+
+        if (rv == -1) { //error in select
+            D(cout << "ERROR in select() for Acceptor" << endl;)
+        } else if (rv == 0) {
+            D(cout<<"Unexpected select timeout in Acceptor"<<endl;)
+            break;
+        } else {
+            for (int i = 0; i < 2; i++) {
+                if (FD_ISSET(fds[i], &temp_set)) { // we got one!!
+                    char buf[kMaxDataSize];
+                    if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1) {
+                        D(cout << "ERROR in receiving from scout or leader"<< endl;)
+                        // pthread_exit(NULL); //TODO: think about whether it should be exit or not
+                    } else if (num_bytes == 0) {     //connection closed
+                        D(cout << "Accepter connection for "<<get_pid()<<" closed by leader."<< endl;)
+                    } else {
+                        buf[num_bytes] = '\0';
+                        std::vector<string> message = split(string(buf), kMessageDelim[0]);
+                        for (const auto &msg : message) {
+                            std::vector<string> token = split(string(msg), kInternalDelim[0]);
+                            if (token[0] == kP1a) 
+                            {
+                                D(cout << get_pid()<< " received P1a" << "message"<<  endl;)
+
+                                Ballot recvd_ballot = stringToBallot(token[2]);
+                                if (recvd_ballot > ballot_num_)
+                                    ballot_num_ = recvd_ballot;
+                                
+                                SendP1b(recvd_ballot, accepted_);
+
+                            }
+                            else if(token[0] == kP2a)
+                            {
+                                D(cout << get_pid()<< " received P2a" << "message"<<  endl;)
+
+                                Triple recvd_triple = stringToTriple(token[2]);
+                                if (recvd_triple.b >= ballot_num_)
+                                {
+                                    ballot_num_ = recvd_triple.b;
+                                    accepted_.insert(recvd_triple);
+                                }
+                                SendP2b(ballot_num_);
+
+                            }
+                            else {    //other messages
+                                D(cout << "Unexpected message in Acceptor " << msg << endl;)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+      }
 }
 
-//actually leader thread for each replica required. but here only one replica sends leader anything
+//have to create for each server
 void* AcceptorThread(void* _rcv_thread_arg) {
     AcceptorThreadArgument *rcv_thread_arg = (AcceptorThreadArgument *)_rcv_thread_arg;
     Server *S = rcv_thread_arg->S;

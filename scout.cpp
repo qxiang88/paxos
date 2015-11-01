@@ -57,7 +57,7 @@ void Server::SendP1a(const Ballot& b)
 void Server::SendAdopted(const Ballot& recvd_ballot, unordered_set<Triple> pvalues) {
     string msg = kAdopted + kInternalDelim + ballotToString(recvd_ballot) + kInternalDelim;
     msg += tripleSetToString(pvalues) + kMessageDelim;
-    SendToLeader(msg);
+    Unicast(kAdopted, msg);
 }
 
 
