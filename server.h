@@ -7,13 +7,13 @@ using namespace std;
 
 void* ReceiveMessagesFromClient(void* _rcv_thread_arg);
 
-struct Command {
+struct Proposal {
     string client_id;
     string chat_id;
     string msg;
 
-    Command() { }
-    Command(const string &client_id,
+    Proposal() { }
+    Proposal(const string &client_id,
             const string &chat_id,
             const string &msg)
         : client_id(client_id),
@@ -39,7 +39,7 @@ struct Ballot {
 struct Triple {
     Ballot b;
     int s;
-    Command p;
+    Proposal p;
 };
 
 class Server {
@@ -55,9 +55,10 @@ public:
     void ConnectToOtherServers();
     void IncrementSlotNum();
     void IncrementBallotNum();
-    void Propose(const Command &p);
+    void Propose(const Proposal &p);
 
     int get_pid();
+    int get_self_paxos_fd();
     int get_server_paxos_fd(const int server_id);
     int get_client_chat_fd(const int client_id);
     int get_master_port();
@@ -68,6 +69,7 @@ public:
     int get_slot_num();
     Ballot get_ballot_num();
 
+    void set_self_paxos_fd(const int fd);
     void set_server_paxos_fd(const int server_id, const int fd);
     void set_client_chat_fd(const int client_id, const int fd);
     void set_pid(const int pid);
@@ -84,10 +86,11 @@ private:
     int slot_num_;
     Ballot ballot_num_;
 
-    std::map<int, Command> proposals_;  // map of s,Command
-    std::map<int, Command> decisions_;
+    std::map<int, Proposal> proposals_;  // map of s,Proposal
+    std::map<int, Proposal> decisions_;
 
     int master_fd_;
+    int self_paxos_fd_;
     std::vector<int> server_paxos_fd_;
     std::vector<int> client_chat_fd_;
 

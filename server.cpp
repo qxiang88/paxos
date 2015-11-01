@@ -11,7 +11,7 @@
 #include "sys/socket.h"
 using namespace std;
 
-typedef pair<int, Command> SPtuple;
+typedef pair<int, Proposal> SPtuple;
 
 #define DEBUG
 
@@ -35,11 +35,11 @@ bool Ballot::operator>(const Ballot &b2) const {
             return true;
         else
             return false;
-        }
+    }
 }
 
 bool Ballot::operator<(const Ballot &b2) const {
-    return !((*this)>=b2);
+    return !((*this) >= b2);
 }
 
 bool Ballot::operator==(const Ballot &b2) const {
@@ -51,7 +51,7 @@ bool Ballot::operator>=(const Ballot &b2) const {
 }
 
 bool Ballot::operator<=(const Ballot &b2) const {
-    return !((*this)>b2);
+    return !((*this) > b2);
 }
 
 int Server::get_pid() {
@@ -64,6 +64,10 @@ int Server::get_server_paxos_fd(const int server_id) {
 
 int Server::get_client_chat_fd(const int client_id) {
     return client_chat_fd_[client_id];
+}
+
+int Server::get_self_paxos_fd() {
+    return self_paxos_fd_;
 }
 
 int Server::get_master_port() {
@@ -103,6 +107,10 @@ void Server::set_client_chat_fd(const int client_id, const int fd) {
     if (fd == -1 || client_chat_fd_[client_id] == -1) {
         client_chat_fd_[client_id] = fd;
     }
+}
+
+void Server::set_self_paxos_fd(const int fd) {
+    self_paxos_fd_ = fd;
 }
 
 void Server::set_pid(const int pid) {
@@ -269,8 +277,8 @@ void Server::CreateReceiveThreadsForClients() {
     }
 }
 
-void Server::Propose(const Command &p) {
-    
+void Server::Propose(const Proposal &p) {
+
 }
 
 /**
@@ -308,7 +316,7 @@ void* ReceiveMessagesFromClient(void* _rcv_thread_arg) {
                 // token[2] is chat_id
                 // token[3] is the chat message
                 if (token[0] == kChat) {
-                    Command p(token[1],token[2],token[3]);
+                    Proposal p(token[1], token[2], token[3]);
                     S->Propose(p);
                 } else {
                     D(cout << "S" << S->get_pid()
