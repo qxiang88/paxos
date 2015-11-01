@@ -21,8 +21,15 @@ struct Ballot {
         id = -1;
         seq_num = -1;
     };
-    
+
     Ballot(int i, int s): id(i), seq_num(s) {}
+
+    bool operator>(const Ballot &b2) const;
+    bool operator<(const Ballot &b2) const;
+    bool operator==(const Ballot &b2) const;
+    bool operator>=(const Ballot &b2) const;
+    bool operator<=(const Ballot &b2) const;
+
 };
 
 struct Triple {

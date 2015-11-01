@@ -23,6 +23,35 @@ extern void* AcceptConnections(void* _S);
 extern std::vector<string> split(const std::string &s, char delim);
 extern void CreateThread(void* (*f)(void* ), void* arg, pthread_t &thread);
 
+bool Ballot::operator>(const Ballot &b2) const {
+    if (this->seq_num > b2.seq_num)
+        return true;
+    else if (this->seq_num < b2.seq_num)
+        return false;
+    else if (this->seq_num == b2.seq_num) {
+        if (this->id > b2.id)
+            return true;
+        else
+            return false;
+        }
+}
+
+bool Ballot::operator<(const Ballot &b2) const {
+    return !((*this)>=b2);
+}
+
+bool Ballot::operator==(const Ballot &b2) const {
+    return ((this->seq_num == b2.seq_num) && (this->id == b2.id));
+}
+
+bool Ballot::operator>=(const Ballot &b2) const {
+    return ((*this) == b2 || (*this) > b2);
+}
+
+bool Ballot::operator<=(const Ballot &b2) const {
+    return !((*this)>b2);
+}
+
 int Server::get_pid() {
     return pid_;
 }
