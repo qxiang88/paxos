@@ -1,5 +1,6 @@
 #include "master.h"
 #include "constants.h"
+#include "utilities.h"
 #include "iostream"
 #include "vector"
 #include "string"

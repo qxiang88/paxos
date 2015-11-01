@@ -1,3 +1,59 @@
+#include "utilities.h"
+
+bool Proposal::operator==(const Proposal &p2) const {
+    return ((this->client_id == p2.client_id) && (this->chat_id == p2.chat_id) && (this->msg == p2.msg));
+}
+
+bool Triple::operator==(const Triple &t2) const {
+    return ((this->b == t2.b) && (this->s == t2.s) && (this->p == t2.p));
+}
+
+bool Ballot::operator>(const Ballot &b2) const {
+    if (this->seq_num > b2.seq_num)
+        return true;
+    else if (this->seq_num < b2.seq_num)
+        return false;
+    else if (this->seq_num == b2.seq_num) {
+        if (this->id > b2.id)
+            return true;
+        else
+            return false;
+    }
+}
+
+bool Ballot::operator<(const Ballot &b2) const {
+    return !((*this) >= b2);
+}
+
+bool Ballot::operator==(const Ballot &b2) const {
+    return ((this->seq_num == b2.seq_num) && (this->id == b2.id));
+}
+
+bool Ballot::operator>=(const Ballot &b2) const {
+    return ((*this) == b2 || (*this) > b2);
+}
+
+bool Ballot::operator<=(const Ballot &b2) const {
+    return !((*this) > b2);
+}
+
+// bool Ballot::operator()(const Ballot &b) const {
+//     return ((hash<int>() (b.id)
+//             ^ ( hash<int>() (b.seq_num) <<1 )));
+                                
+// }
+
+// bool Proposal::operator()(const Proposal &p) const {
+//     return ((hash<string>()(p.client_id)
+//                ^ (hash<string>()(p.chat_id) << 1)) >> 1)
+//                ^ (hash<string>()(p.msg) << 1);
+// }
+
+// bool Triple::operator()(const Triple &t) const{
+//     return ((hash<Ballot>()(t.b)
+//                ^ (hash<int>()(t.s) << 1)) >> 1)
+//                ^ (hash<Proposal>()(t.p) << 1);
+// }
 
 
 std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
@@ -23,21 +79,34 @@ string tripleToString(const Triple& t)
     s+=kInternalStructDelim;
     s += to_string(t.s);
     s+=kInternalStructDelim;
-    s += to_string(t.p.client_id);
+    s += t.p.client_id;
     s+=kInternalStructDelim;
-    s += to_string(t.p.chat_id);
+    s += t.p.chat_id;
     s+=kInternalStructDelim;
-    s += msg;
+    s += t.p.msg;
 
     return s;
 }
 
 
+void union_set(unordered_set<Triple>& s1, unordered_set<Triple>&s2)
+{
+    unordered_set <Triple> un; 
+    unordered_set<Triple>::iterator got;
+    for(auto it=s2.begin(); it!=s2.end(); it++)
+    {
+        got = s1.find(*it);
+        if(got==s1.end())
+            s1.insert(*it);
+    }
+}
+
+
 string proposalToString(const Proposal& p)
 {
-    string s = to_string(t.p.client_id);
+    string s = p.client_id;
     s+=kInternalStructDelim;
-    s += to_string(t.p.chat_id);
+    s += p.chat_id;
     return s;
 }
 
@@ -47,35 +116,6 @@ string ballotToString(const Ballot& b)
     s+=kInternalStructDelim;
     s += to_string(b.seq_num);
     return s;
-}
-
-Triple stringToTriple(const string& s)
-{
-    Triple t;
-    Proposal p;
-    Ballot b;
-    vector<string> parts = split(s, kInternalStructDelim);
-    if(parts.size()!=6)D(cout<<"Error not proper triple. Size is "<<parts.size())<<endl;)
-    b.id = stoi(parts[0]);
-    b.seq_num = stoi(parts[1]);
-    t.b = stoi(b);
-    t.s = stoi(parts[2]);
-    p.client_id = stoi(parts[3]);
-    p.chat_id = stoi(parts[4]);
-    p.msg = parts[5];
-    t.p = p;
-    return t;
-}
-
-unordered_set<Triple> stringToTripleSet(const string& s)
-{
-    unordered_set<Triple> st;
-    vector<string> parts = split(s, kInternalSetDelim);
-    for (auto it=parts.begin(); it!=parts.end(); it++)
-    {
-        Triple t = stringToTriple(*it);
-        st.insert(t);
-    }
 }
 
 string tripleSetToString(const unordered_set<Triple>& st)
@@ -90,24 +130,46 @@ string tripleSetToString(const unordered_set<Triple>& st)
     return rval;
 }
 
+
+Triple stringToTriple(const string& s)
+{
+    Triple t;
+    Proposal p;
+    Ballot b;
+    vector<string> parts = split(s, kInternalStructDelim[0]);
+    if(parts.size()!=6)D(cout<<"Error not proper triple. Size is "<<parts.size()<<endl;)
+    b.id = stoi(parts[0]);
+    b.seq_num = stoi(parts[1]);
+    t.b = b;
+    t.s = stoi(parts[2]);
+    p.client_id = parts[3];
+    p.chat_id = parts[4];
+    p.msg = parts[5];
+    t.p = p;
+    return t;
+}
+
+unordered_set<Triple> stringToTripleSet(const string& s)
+{
+    unordered_set<Triple> st;
+    vector<string> parts = split(s, kInternalSetDelim[0]);
+    for (auto it=parts.begin(); it!=parts.end(); it++)
+    {
+        Triple t = stringToTriple(*it);
+        st.insert(t);
+    }
+}
+
+
 Ballot stringToBallot(const string& s)
 {
     Ballot b;
-    vector<string> parts = split(s, kInternalStructDelim);
+    vector<string> parts = split(s, kInternalStructDelim[0]);
     b.id = stoi(parts[0]);
     b.seq_num = stoi(parts[1]);
     return b;
 }
 
-void union_set(unordered_set<Triple>& s1, unordered_set<Triple>&s2)
-{
-    unordered_set <Triple> un; 
-    for(auto it=s2.begin(); it!=s2.end(); it++)
-    {
-        if(s1.find(*it)==s1.end())
-            s1.insert(*it);
-    }
-}
 
 /**
  * creates a new thread

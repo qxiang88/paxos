@@ -61,9 +61,9 @@ void* Commander(void* _rcv_thread_arg) {
             break;
         } else {
             for (int i=0; i<num_servers; i++) {
-               if (FD_ISSET(p->get_acceptor_fd(i), &temp_set)) { // we got one!!
+               if (FD_ISSET(S->get_acceptor_fd(i), &temp_set)) { // we got one!!
                    char buf[kMaxDataSize];
-                   if ((num_bytes = recv(p->get_acceptor_fd(i), buf, kMaxDataSize - 1, 0)) == -1) {
+                   if ((num_bytes = recv(S->get_acceptor_fd(i), buf, kMaxDataSize - 1, 0)) == -1) {
                        D(cout << "ERROR in receiving p2b from " << i << endl;)
                        // pthread_exit(NULL); //TODO: think about whether it should be exit or not
                    } else if (num_bytes == 0) {     //connection closed
@@ -83,7 +83,7 @@ void* Commander(void* _rcv_thread_arg) {
                                     if(waitfor<(num_servers/2))
                                     {
                                         S->SendDecision(*toSend);
-                                        return NULL:
+                                        return NULL;
                                     }   
                                 } else {
                                     S->SendPreEmpted(recvd_ballot);

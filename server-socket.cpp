@@ -233,6 +233,9 @@ bool Server::ConnectToServer(const int server_id) {
     }
     // int outgoing_port = ntohs(return_port_no((struct sockaddr *)l->ai_addr));
     freeaddrinfo(servinfo); // all done with this structure
-    set_server_paxos_fd(server_id, sockfd);
+    if (server_id == get_pid())
+        set_self_paxos_fd(sockfd);
+    else
+        set_server_paxos_fd(server_id, sockfd);
     return true;
 }

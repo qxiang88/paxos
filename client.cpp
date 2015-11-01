@@ -1,4 +1,5 @@
 #include "client.h"
+#include "utilities.h"
 #include "constants.h"
 #include "iostream"
 #include "vector"
@@ -148,16 +149,19 @@ void Client::Initialize(const int pid,
  * @param chat_message body of chat message
  */
 void Client::SendChatToLeader(const int chat_id, const string &chat_message) {
-    string msg = to_string(chat_id) + kInternalDelim + chat_message + kMessageDelim;
+    string msg = kChat + kInternalDelim +
+                 to_string(get_pid()) + kInternalDelim +
+                 to_string(chat_id) + kInternalDelim +
+                 chat_message + kMessageDelim;
     int leader_id = get_leader_id();
     if (send(get_leader_fd(), msg.c_str(), msg.size(), 0) == -1) {
         D(cout << "C" << get_pid() << ": ERROR: Cannot send chat message to leader S"
-                     << leader_id << endl;)
+          << leader_id << endl;)
         //TODO: Need to take some action like increment leader_id?
         //or wait for update command from master?
     } else {
         D(cout << "C" << get_pid() << ": Chat message sent to leader S"
-                     << leader_id << ": " << msg << endl;)
+          << leader_id << ": " << msg << endl;)
     }
 }
 
@@ -205,7 +209,7 @@ void Client::ConstructChatLogMessage(string &msg) {
     // msg = to_string(final_chat_log_.size()) + kMessageDelim;
     for (auto const &c : final_chat_log_) {
         msg += c.sequence_num + kInternalDelim
-               + c.sender_index + kInternalDelim 
+               + c.sender_index + kInternalDelim
                + c.body + kMessageDelim;
     }
 

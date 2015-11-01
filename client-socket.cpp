@@ -1,4 +1,5 @@
 #include "client.h"
+#include "utilities.h"
 #include "constants.h"
 #include "iostream"
 #include "unistd.h"

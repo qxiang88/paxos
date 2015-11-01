@@ -13,6 +13,8 @@
 #include "limits.h"
 using namespace std;
 
+typedef pair<int, Proposal> SPtuple;
+
 #define DEBUG
 
 #ifdef DEBUG
@@ -36,6 +38,10 @@ int Server::get_client_chat_fd(const int client_id) {
     return client_chat_fd_[client_id];
 }
 
+int Server::get_self_paxos_fd() {
+    return self_paxos_fd_;
+}
+
 int Server::get_master_port() {
     return master_port_;
 }
@@ -56,6 +62,39 @@ int Server::get_leader_id() {
     return leader_id_;
 }
 
+int Server::get_slot_num() {
+    return slot_num_;
+}
+
+int Server::get_num_servers() {
+    return num_servers_;
+}
+
+Ballot Server::get_ballot_num() {
+    return ballot_num_;
+}
+
+int Server::get_self_replica_fd()
+{
+    return 1;
+}
+int Server::get_self_acceptor_fd()
+{
+    return 1;
+}
+int Server::get_self_leader_fd(){
+    return 1;
+}
+
+int Server::get_replica_fd(const int server_id)
+{
+    return 1;
+}
+int Server::get_acceptor_fd(const int server_id)
+{
+    return 1;
+}
+
 void Server::set_server_paxos_fd(const int server_id, const int fd) {
     if (fd == -1 || server_paxos_fd_[server_id] == -1)
         server_paxos_fd_[server_id] = fd;
@@ -65,6 +104,10 @@ void Server::set_client_chat_fd(const int client_id, const int fd) {
     if (fd == -1 || client_chat_fd_[client_id] == -1) {
         client_chat_fd_[client_id] = fd;
     }
+}
+
+void Server::set_self_paxos_fd(const int fd) {
+    self_paxos_fd_ = fd;
 }
 
 void Server::set_pid(const int pid) {
@@ -77,6 +120,31 @@ void Server::set_master_fd(const int fd) {
 
 void Server::set_leader_id(const int leader_id) {
     leader_id_ = leader_id;
+}
+
+void Server::set_slot_num(const int slot_num) {
+    slot_num_ = slot_num;
+}
+
+void Server::set_ballot_num(const Ballot &ballot_num) {
+    ballot_num_.id = ballot_num.id;
+    ballot_num_.seq_num = ballot_num.seq_num;
+}
+
+/**
+ * increments the value of slot_num_
+ */
+void Server::IncrementSlotNum() {
+    set_slot_num(get_slot_num() + 1);
+}
+
+/**
+ * increments the value of ballot_num_
+ */
+void Server::IncrementBallotNum() {
+    Ballot b = get_ballot_num();
+    b.seq_num++;
+    set_ballot_num(b);
 }
 
 /**
@@ -162,6 +230,8 @@ void Server::Initialize(const int pid,
                         const int num_clients) {
     set_pid(pid);
     set_leader_id(0);
+    set_slot_num(0);
+    set_ballot_num(Ballot(pid, 0));
     num_servers_ = num_servers;
     num_clients_ = num_clients;
     server_paxos_fd_.resize(num_servers_, -1);
@@ -177,7 +247,7 @@ void Server::Initialize(const int pid,
  * this logic makes sure that a pair is connected only once
  */
 void Server::ConnectToOtherServers() {
-    for (int i = 0; i < get_pid(); ++i) {
+    for (int i = 0; i <= get_pid(); ++i) {
         if (ConnectToServer(i)) {
             D(cout << "S" << get_pid() << ": Connected to server S" << i << endl;)
         } else {
@@ -204,9 +274,13 @@ void Server::CreateReceiveThreadsForClients() {
     }
 }
 
+void Server::Propose(const Proposal &p) {
+
+}
+
 /**
  * function for the thread receiving messages from a client with id=client_id
- * @param _rcv_thread_arg argument containing server object and client_id 
+ * @param _rcv_thread_arg argument containing server object and client_id
  */
 void* ReceiveMessagesFromClient(void* _rcv_thread_arg) {
     ReceiveThreadArgument *rcv_thread_arg = (ReceiveThreadArgument *)_rcv_thread_arg;
@@ -220,21 +294,32 @@ void* ReceiveMessagesFromClient(void* _rcv_thread_arg) {
         num_bytes = recv(S->get_client_chat_fd(client_id), buf, kMaxDataSize - 1, 0);
         if (num_bytes == -1) {
             D(cout << "S" << S->get_pid() << ": ERROR in receiving message from C"
-                 << client_id << endl;)
+              << client_id << endl;)
             return NULL;
         } else if (num_bytes == 0) {    // connection closed by client
             D(cout << "S" << S->get_pid() << ": ERROR: Connection closed by Client." << endl;)
             return NULL;
         } else {
             buf[num_bytes] = '\0';
-            D(cout << "S" << S->get_pid() << ": Message received from C" << client_id << " - " << buf << endl;)
+            D(cout << "S" << S->get_pid() << ": Message received from C"
+              << client_id << " - " << buf << endl;)
 
             // extract multiple messages from the received buf
             std::vector<string> message = split(string(buf), kMessageDelim[0]);
             for (const auto &msg : message) {
                 std::vector<string> token = split(string(msg), kInternalDelim[0]);
-                // token[0] is chat_id
-                // token[1] is the chat message
+                // token[0] is the CHAT tag
+                // token[1] is client id
+                // token[2] is chat_id
+                // token[3] is the chat message
+                if (token[0] == kChat) {
+                    Proposal p(token[1], token[2], token[3]);
+                    S->Propose(p);
+                } else {
+                    D(cout << "S" << S->get_pid()
+                      << ": ERROR Unexpected message received from C" << client_id
+                      << " - " << buf << endl;)
+                }
             }
         }
     }
@@ -247,8 +332,8 @@ fd_set Server::GetAcceptorFdSet()
     fd_set acceptor_set;
     int fd_max=INT_MIN, fd_temp;
     FD_ZERO(&acceptor_set);
-    for (int i=0; i<S->get_num_servers(); i++) {
-        fd_temp = S->get_acceptor_fd(i);
+    for (int i=0; i<get_num_servers(); i++) {
+        fd_temp = get_acceptor_fd(i);
         FD_SET(fd_temp, &acceptor_set);
         fd_max = max(fd_max, fd_temp);
     }
@@ -258,8 +343,8 @@ fd_set Server::GetAcceptorFdSet()
 int Server::GetMaxAcceptorFd()
 {
     int fd_max=INT_MIN, fd_temp;
-    for (int i=0; i<S->get_num_servers(); i++) {
-        fd_temp = S->get_acceptor_fd(i);
+    for (int i=0; i<get_num_servers(); i++) {
+        fd_temp = get_acceptor_fd(i);
         fd_max = max(fd_max, fd_temp);
     }
     return fd_max;
@@ -273,9 +358,9 @@ void Server::SendToServers(const string& type, const string& msg)
         if(i==get_pid())
         {
             if(type==kDecision)
-                serv_fd = get_self_replica_fd(i);
+                serv_fd = get_self_replica_fd();
             else if(type==kP2a || type==kP1a)
-                serv_fd = get_self_acceptor_fd(i);
+                serv_fd = get_self_acceptor_fd();
         }
         else{
             if(type==kDecision)
@@ -285,10 +370,10 @@ void Server::SendToServers(const string& type, const string& msg)
         }
 
         if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
-            D(cout << "P" << get_pid() << ": ERROR: sending to P" << (it->first) << endl;)
+            D(cout << ": ERROR: sending to " << (i) << endl;)
         }
         else {
-            D(cout << "P" << get_pid() << ": Msg sent to P" << (it->first) << ": " << msg << endl;)
+            D(cout << ": Msg sent to " << (i) << endl;)
         }
     }    
 }
@@ -308,7 +393,7 @@ void Server::SendToLeader(const string&msg)
 void Server::SendPreEmpted(const Ballot& b)
 {
     string msg = kPreEmpted + kInternalDelim + ballotToString(b)+ kMessageDelim;
-    SendToLeader(kPreEmpted, msg);
+    SendToLeader(msg);
 }
 
 int main(int argc, char *argv[]) {
