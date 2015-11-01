@@ -1,5 +1,6 @@
 #include "server.h"
 #include "constants.h"
+#include "utilities.h"
 #include "iostream"
 #include "vector"
 #include "string"
@@ -9,6 +10,7 @@
 #include "signal.h"
 #include "errno.h"
 #include "sys/socket.h"
+#include "limits.h"
 using namespace std;
 
 #define DEBUG
@@ -20,8 +22,7 @@ using namespace std;
 #endif // DEBUG
 
 extern void* AcceptConnections(void* _S);
-extern std::vector<string> split(const std::string &s, char delim);
-extern void CreateThread(void* (*f)(void* ), void* arg, pthread_t &thread);
+
 
 int Server::get_pid() {
     return pid_;
@@ -238,6 +239,76 @@ void* ReceiveMessagesFromClient(void* _rcv_thread_arg) {
         }
     }
     return NULL;
+}
+
+
+fd_set Server::GetAcceptorFdSet()
+{
+    fd_set acceptor_set;
+    int fd_max=INT_MIN, fd_temp;
+    FD_ZERO(&acceptor_set);
+    for (int i=0; i<S->get_num_servers(); i++) {
+        fd_temp = S->get_acceptor_fd(i);
+        FD_SET(fd_temp, &acceptor_set);
+        fd_max = max(fd_max, fd_temp);
+    }
+    return acceptor_set;
+}
+
+int Server::GetMaxAcceptorFd()
+{
+    int fd_max=INT_MIN, fd_temp;
+    for (int i=0; i<S->get_num_servers(); i++) {
+        fd_temp = S->get_acceptor_fd(i);
+        fd_max = max(fd_max, fd_temp);
+    }
+    return fd_max;
+}
+
+void Server::SendToServers(const string& type, const string& msg)
+{
+    int serv_fd;
+    for(int i=0;i<num_servers_; i++)
+    {
+        if(i==get_pid())
+        {
+            if(type==kDecision)
+                serv_fd = get_self_replica_fd(i);
+            else if(type==kP2a || type==kP1a)
+                serv_fd = get_self_acceptor_fd(i);
+        }
+        else{
+            if(type==kDecision)
+                serv_fd = get_replica_fd(i);
+            else if(type==kP2a || type==kP1a)
+                serv_fd = get_acceptor_fd(i);
+        }
+
+        if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
+            D(cout << "P" << get_pid() << ": ERROR: sending to P" << (it->first) << endl;)
+        }
+        else {
+            D(cout << "P" << get_pid() << ": Msg sent to P" << (it->first) << ": " << msg << endl;)
+        }
+    }    
+}
+
+
+void Server::SendToLeader(const string&msg)
+{
+    int serv_fd = get_self_leader_fd(); //confirm line
+    if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
+        D(cout << ": ERROR: sending to leader" << endl;)
+    }
+    else {
+        D(cout << ": Msg sent to leader" << endl;)
+    }
+}
+
+void Server::SendPreEmpted(const Ballot& b)
+{
+    string msg = kPreEmpted + kInternalDelim + ballotToString(b)+ kMessageDelim;
+    SendToLeader(kPreEmpted, msg);
 }
 
 int main(int argc, char *argv[]) {

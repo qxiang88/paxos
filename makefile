@@ -9,7 +9,7 @@ master.o: master.cpp master.h constants.h
 master-socket.o: master-socket.cpp master.h
 	g++ -g -std=c++0x -c master-socket.cpp
 
-server: server.o server-socket.o utilities.o
+server: server.o server-socket.o utilities.o commander.o scout.o
 	g++ -g -std=c++0x -o server server.o server-socket.o utilities.o -pthread
 
 server.o: server.cpp server.h constants.h
@@ -27,8 +27,14 @@ client.o: client.cpp client.h constants.h
 client-socket.o: client-socket.cpp client.h constants.h
 	g++ -g -std=c++0x -c client-socket.cpp
 
-utilities.o: utilities.cpp
+utilities.o: utilities.cpp utilities.h constants.h
 	g++ -g -std=c++0x -c utilities.cpp
+
+commander.o: commander.cpp constants.h utilities.h
+	g++ -g -std=c++0x -c commander.cpp
+
+scout.o: scout.cpp constants.h utilities.h
+	g++ -g -std=c++0x -c scout.cpp
 
 clean:
 	rm -f *.o master server client

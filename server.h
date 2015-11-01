@@ -18,8 +18,12 @@ public:
     void CreateReceiveThreadsForClients();
     bool ConnectToServer(const int server_id);
     void ConnectToOtherServers();
+    
+    void SendP1a(const Ballot& b);
+    void SendAdopted(const Ballot& recvd_ballot, unordered_set<Triple> pvalues);
 
     int get_pid();
+    int get_num_servers();
     int get_server_paxos_fd(const int server_id);
     int get_client_chat_fd(const int client_id);
     int get_master_port();
@@ -57,6 +61,16 @@ private:
 struct ReceiveThreadArgument {
     Server *S;
     int client_id;
+};
+
+struct CommanderThreadArgument {
+    Server *S;
+    Triple *toSend;
+};
+
+struct CommanderThreadArgument {
+    Server *S;
+    Ballot *ball;
 };
 
 #endif //SERVER_H_
