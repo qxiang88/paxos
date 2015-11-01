@@ -11,6 +11,8 @@
 #include "sys/socket.h"
 using namespace std;
 
+typedef pair<int, Command> SPtuple;
+
 #define DEBUG
 
 #ifdef DEBUG
@@ -240,7 +242,7 @@ void Server::Initialize(const int pid,
  * this logic makes sure that a pair is connected only once
  */
 void Server::ConnectToOtherServers() {
-    for (int i = 0; i < get_pid(); ++i) {
+    for (int i = 0; i <= get_pid(); ++i) {
         if (ConnectToServer(i)) {
             D(cout << "S" << get_pid() << ": Connected to server S" << i << endl;)
         } else {
@@ -265,6 +267,10 @@ void Server::CreateReceiveThreadsForClients() {
                      (void *)rcv_thread_arg[i],
                      receive_from_client_thread[i]);
     }
+}
+
+void Server::Propose(const Command &p) {
+    
 }
 
 /**
@@ -302,7 +308,8 @@ void* ReceiveMessagesFromClient(void* _rcv_thread_arg) {
                 // token[2] is chat_id
                 // token[3] is the chat message
                 if (token[0] == kChat) {
-                    
+                    Command p(token[1],token[2],token[3]);
+                    S->Propose(p);
                 } else {
                     D(cout << "S" << S->get_pid()
                       << ": ERROR Unexpected message received from C" << client_id

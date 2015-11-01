@@ -8,12 +8,14 @@ using namespace std;
 void* ReceiveMessagesFromClient(void* _rcv_thread_arg);
 
 struct Command {
-    int client_id;
-    int chat_id;
+    string client_id;
+    string chat_id;
     string msg;
 
     Command() { }
-    Command(int client_id, int chat_id, string &msg)
+    Command(const string &client_id,
+            const string &chat_id,
+            const string &msg)
         : client_id(client_id),
           chat_id(chat_id),
           msg(msg) { }
@@ -53,6 +55,7 @@ public:
     void ConnectToOtherServers();
     void IncrementSlotNum();
     void IncrementBallotNum();
+    void Propose(const Command &p);
 
     int get_pid();
     int get_server_paxos_fd(const int server_id);
@@ -81,7 +84,7 @@ private:
     int slot_num_;
     Ballot ballot_num_;
 
-    std::map<int, Command> proposals_;
+    std::map<int, Command> proposals_;  // map of s,Command
     std::map<int, Command> decisions_;
 
     int master_fd_;
