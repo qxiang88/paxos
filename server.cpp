@@ -302,7 +302,7 @@ void* ReceiveMessagesFromClient(void* _rcv_thread_arg) {
                 // token[2] is chat_id
                 // token[3] is the chat message
                 if (token[0] == kChat) {
-
+                    
                 } else {
                     D(cout << "S" << S->get_pid()
                       << ": ERROR Unexpected message received from C" << client_id

@@ -11,17 +11,19 @@ struct Command {
     int client_id;
     int chat_id;
     string msg;
+
+    Command() { }
+    Command(int client_id, int chat_id, string &msg)
+        : client_id(client_id),
+          chat_id(chat_id),
+          msg(msg) { }
 };
 
 struct Ballot {
     int id;
     int seq_num;
 
-    Ballot() {
-        id = -1;
-        seq_num = -1;
-    };
-
+    Ballot() { }
     Ballot(int i, int s): id(i), seq_num(s) {}
 
     bool operator>(const Ballot &b2) const;
