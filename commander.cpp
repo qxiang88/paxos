@@ -47,11 +47,22 @@ void Server::CommanderAcceptThread() {
     CreateThread(AcceptConnectionsCommander, (void*)this, accept_connections_thread);
 }
 
-void Server::SendP2a(const Triple & t)
+void Server::SendP2a(const Triple & t, vector<int> acceptor_peer_fd)
 {
-    string msg = kP2a + kInternalDelim + to_string(get_pid());
-    msg += kInternalDelim + tripleToString(t) + kMessageDelim;
-    SendToServers(kP2a, msg);
+    int serv_fd;
+    for (int i = 0; i < num_servers_; i++)
+    {
+        serv_fd = get_acceptor_fd(i);
+        string msg = kP2a + kInternalDelim + to_string(acceptor_peer_fd[i]);
+        msg += kInternalDelim + tripleToString(t) + kMessageDelim;
+        
+        if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
+            D(cout << ": ERROR: sending to " << (i) << endl;)
+        }
+        else {
+            D(cout << ": Msg sent to " << (i) << endl;)
+        }
+    }
 }
 
 void Server::SendDecision(const Triple & t)
@@ -67,7 +78,9 @@ void* Commander(void* _rcv_thread_arg) {
     Server *S = rcv_thread_arg->S;
     Triple * toSend = rcv_thread_arg->toSend;
 
-    S->SendP2a(*toSend);
+    vector<int> acceptor_peer_fd;
+    
+    S->SendP2a(*toSend, acceptor_peer_fd);
 
     int num_bytes;
 

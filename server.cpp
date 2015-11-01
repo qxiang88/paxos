@@ -60,6 +60,10 @@ int Server::get_num_servers() {
     return num_servers_;
 }
 
+int Server::get_num_clients() {
+    return num_clients_;
+}
+
 Ballot Server::get_ballot_num() {
     return ballot_num_;
 }
@@ -239,19 +243,10 @@ void Server::SendToServers(const string& type, const string& msg)
     int serv_fd;
     for (int i = 0; i < num_servers_; i++)
     {
-        // if(i==get_pid())
-        // {
-        // if(type==kDecision)
-        // serv_fd = get_replica_fd();
-        // else if(type==kP2a || type==kP1a)
-        // serv_fd = get_self_acceptor_fd();
-        // }
-        // else{
         if (type == kDecision)
             serv_fd = get_replica_fd(i);
-        else if (type == kP2a || type == kP1a)
+        else if (type == kP1a) //p2a sent in commander
             serv_fd = get_acceptor_fd(i);
-        // }
 
         if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
             D(cout << ": ERROR: sending to " << (i) << endl;)
@@ -262,14 +257,24 @@ void Server::SendToServers(const string& type, const string& msg)
     }
 }
 
-void Server::Unicast(const string &type, const string& msg)
-{
-    if(type==kPreEmpted || type==kAdopted)
-        serv_fd = get_leader_fd(get_pid());
-    else if(type==kP2b)
-        serv_fd = get_commander_fd(get_pid());
-    else if(type==kP1b)
-        serv_fd = get_scout_fd(get_pid());
+void Server::Unicast(const string &type, const string& msg, int r_fd)
+{   
+    int serv_fd;
+    if(r_fd==-1)
+    {
+        if(type==kPreEmpted || type==kAdopted || type==kPropose)
+            serv_fd = get_leader_fd(get_pid());
+        else if(type==kP2b)
+            serv_fd = get_commander_fd(get_pid());
+        else if(type==kP1b)
+            serv_fd = get_scout_fd(get_pid());            
+    }
+    else
+    {
+        //as of now only used for commander to acceptor messages    
+        D(cout<<"using non default port for unicast"<<endl;)
+        serv_fd = r_fd;
+    }
 
     if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
         D(cout << ": ERROR: sending "<<type<< endl;)

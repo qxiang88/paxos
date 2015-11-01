@@ -25,13 +25,18 @@ public:
     bool ConnectToServer(const int server_id);
 
     void SendP1a(const Ballot& b);
-    void SendP2a(const Triple& t);
+    void SendP2a(const Triple& , vector<int> );
+    void SendP1b(const Ballot& b, const unordered_set<Triple> &st);
+    void SendP2b(const Ballot& , int);
     void SendDecision(const Triple& t);
     void SendAdopted(const Ballot& recvd_ballot, unordered_set<Triple> pvalues);
     void SendPreEmpted(const Ballot& b);
-
+    void SendProposal(const int &, const Proposal&);
     void SendToServers(const string& type, const string& msg);
     void SendToLeader(const string&);
+    void Unicast(const string &type, const string& msg, int r_fd=-1);
+    void SendResponseToClient(const int& , const Proposal&);
+
     int GetMaxAcceptorFd();
     fd_set GetAcceptorFdSet();
 
@@ -39,7 +44,6 @@ public:
     void IncrementBallotNum();
     void CommanderAcceptThread();
     void ScoutAcceptThread();
-    void Propose(const Proposal &p);
     bool ConnectToCommanderL(const int server_id);
     bool ConnectToCommanderR(const int server_id);
     bool ConnectToCommanderA(const int server_id);
@@ -48,8 +52,11 @@ public:
     bool ConnectToScoutA(const int server_id);
     bool ConnectToReplica(const int server_id);
     void Leader();
-    void Acceptor();
-
+    void Acceptor();   
+    
+    void Replica();
+    void Perform(const int&, const Proposal&);
+    void Propose(const Proposal &p);
 
     int get_pid();
     int get_commander_fd(const int server_id);
@@ -58,6 +65,7 @@ public:
     int get_acceptor_fd(const int server_id);
     int get_leader_fd(const int server_id);
     int get_num_servers();
+    int get_num_clients();
     int get_client_chat_fd(const int client_id);
     int get_master_port();
     int get_server_listen_port(const int server_id);

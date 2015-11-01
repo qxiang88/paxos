@@ -80,6 +80,8 @@ void *AcceptorEntry(void *_S) {
           << S->get_primary_id() << endl;)
         return NULL;
     }
+
+    S->Acceptor();
 }
 void Server::SendP1b(const Ballot& b, const unordered_set<Triple> &st)
 {
@@ -89,16 +91,16 @@ void Server::SendP1b(const Ballot& b, const unordered_set<Triple> &st)
     Unicast(kP1b, msg);
 }
 
-void Server::SendP2b(const Ballot& b)
+void Server::SendP2b(const Ballot& b, int return_fd)
 {
     string msg = kP2b + kInternalDelim + to_string(get_pid());
     msg += kInternalDelim + ballotToString(b) + kMessageDelim;
-    Unicast(kP2b, msg);
+    Unicast(kP2b, msg, return_fd);
 }
 
 void Server::Acceptor()
 {
-    accepted_.clear();
+    // accepted_.clear();
     ballot_num_.id = INT_MIN;
     ballot_num_.seq_num = INT_MIN;
 
@@ -112,11 +114,11 @@ void Server::Acceptor()
 
     fd_temp = get_commander_fd(get_primary_id());
     fd_max = max(fd_max, fd_temp);
-    fds.insert(fd_temp);
+    fds.push_back(fd_temp);
     FD_SET(fd_temp, &subleaders);
     fd_temp = get_scout_fd(get_primary_id());
     fd_max = max(fd_max, fd_temp);
-    fds.insert(fd_temp);
+    fds.push_back(fd_temp);
     FD_SET(fd_temp, &subleaders);
     
     while (true) {  // always listen to messages from the acceptors
@@ -133,10 +135,10 @@ void Server::Acceptor()
                 if (FD_ISSET(fds[i], &temp_set)) { // we got one!!
                     char buf[kMaxDataSize];
                     if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1) {
-                        D(cout << "ERROR in receiving from scout or leader"<< endl;)
+                        D(cout << "ERROR in receiving from scout or commander"<< endl;)
                         // pthread_exit(NULL); //TODO: think about whether it should be exit or not
                     } else if (num_bytes == 0) {     //connection closed
-                        D(cout << "Accepter connection for "<<get_pid()<<" closed by leader."<< endl;)
+                        D(cout << "Accepter connection for "<<get_pid()<<" closed by commander."<< endl;)
                     } else {
                         buf[num_bytes] = '\0';
                         std::vector<string> message = split(string(buf), kMessageDelim[0]);
@@ -150,20 +152,21 @@ void Server::Acceptor()
                                 if (recvd_ballot > ballot_num_)
                                     ballot_num_ = recvd_ballot;
                                 
-                                SendP1b(recvd_ballot, accepted_);
+                                SendP1b(ballot_num_, accepted_);
 
                             }
                             else if(token[0] == kP2a)
                             {
                                 D(cout << get_pid()<< " received P2a" << "message"<<  endl;)
 
+                                int return_fd = stoi(token[1]);
                                 Triple recvd_triple = stringToTriple(token[2]);
                                 if (recvd_triple.b >= ballot_num_)
                                 {
                                     ballot_num_ = recvd_triple.b;
                                     accepted_.insert(recvd_triple);
                                 }
-                                SendP2b(ballot_num_);
+                                SendP2b(ballot_num_, return_fd);
 
                             }
                             else {    //other messages

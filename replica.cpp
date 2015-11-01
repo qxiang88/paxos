@@ -10,6 +10,7 @@
 #include "signal.h"
 #include "errno.h"
 #include "sys/socket.h"
+#include "limits.h"
 using namespace std;
 
 typedef pair<int, Proposal> SPtuple;
@@ -74,9 +75,143 @@ void Server::CreateReceiveThreadsForClients() {
 }
 
 void Server::Propose(const Proposal &p) {
+    for (auto it = decisions_.begin(); it != decisions_.end(); ++it ){
+        if (it->second == p)
+            return;
+    }
 
+    int min_slot;
+    if(proposals_.rbegin()==proposals_.rend())
+        min_slot = 0;
+    else
+        min_slot = proposals_.rbegin()->first;
+
+    while(decisions_.find(min_slot)!=decisions_.end())
+        min_slot++;
+    
+    proposals_[min_slot] = p;
+    SendProposal(min_slot, p);
 }
 
+void Server::SendProposal(const int& s, const Proposal& p)
+{
+    string msg = kPropose + kInternalDelim;
+    msg += to_string(s) + kInternalDelim;
+    msg += proposalToString(p) + kMessageDelim;
+    Unicast(kPropose, msg);
+}
+void Server::Perform(const int& slot, const Proposal& p)
+{
+    for(auto it=decisions_.begin(); it!=decisions_.end(); it++)
+    {
+        if(it->second == p && it->first < slot_num_)
+        {   //think why not increase in loop
+            IncrementSlotNum();
+            return;
+        }
+    }
+
+    IncrementSlotNum();
+    SendResponseToClient(slot, p);
+}
+
+void Server::SendResponseToClient(const int& s, const Proposal& p)
+{
+    string msg = kResponse + kInternalDelim;
+    msg += to_string(s) + kInternalDelim;
+    msg += proposalToString(p) + kMessageDelim;
+    
+    if (send(get_client_chat_fd(stoi(p.client_id)), msg.c_str(), msg.size(), 0) == -1) {
+        D(cout << ": ERROR: sending response to client"<< endl;)
+    }
+    else {
+        D(cout << ": Response Msg sent"<<endl;)
+    }
+}
+
+void Server::Replica()
+{
+    char buf[kMaxDataSize];
+    int num_bytes;
+
+    fd_set fromset, temp_set;
+    vector<int> fds;
+    int fd_max = INT_MIN, fd_temp;
+    FD_ZERO(&fromset);
+
+    for(int i=0; i<get_num_clients(); i++)
+    {   
+        fd_temp = get_client_chat_fd(i);
+        fd_max = max(fd_max, fd_temp);
+        fds.push_back(fd_temp);
+        FD_SET(fd_temp, &fromset);    
+    }
+    fd_temp = get_leader_fd(get_primary_id());
+    fd_max = max(fd_max, fd_temp);
+    fds.push_back(fd_temp);
+    FD_SET(fd_temp, &fromset);
+    
+    while (true) {  // always listen to messages from the acceptors
+        temp_set = fromset;
+        int rv = select(fd_max + 1, &temp_set, NULL, NULL, NULL);
+
+        if (rv == -1) { //error in select
+            D(cout << "ERROR in select() for Replica" << endl;)
+        } else if (rv == 0) {
+            D(cout<<"Unexpected select timeout in Replica"<<endl;)
+            break;
+        } else {
+            for (int i = 0; i < fds.size(); i++) {
+                if (FD_ISSET(fds[i], &temp_set)) { // we got one!!
+                    char buf[kMaxDataSize];
+                    if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1) {
+                        D(cout << "ERROR in receiving from leader or clients"<< endl;)
+                        // pthread_exit(NULL); //TODO: think about whether it should be exit or not
+                    } else if (num_bytes == 0) {     //connection closed
+                        D(cout << "Replica connection for "<<get_pid()<<" closed by leader or client"<< endl;)
+                    } else {
+                        buf[num_bytes] = '\0';
+                        std::vector<string> message = split(string(buf), kMessageDelim[0]);
+                        for (const auto &msg : message) {
+                            std::vector<string> token = split(string(msg), kInternalDelim[0]);
+                            if (token[0] == kChat) 
+                            {
+                                D(cout << get_pid()<< " received chat from client "<<  endl;)
+                                Proposal p = stringToProposal(token[1]);
+                                Propose(p);
+                            }
+                            else if(token[0] == kDecision)
+                            {
+                                D(cout << get_pid()<< " received decision message"<<  endl;)
+                                int s = stoi(token[1]);
+                                Proposal p = stringToProposal(token[2]);
+                                decisions_[s] = p;
+
+                                Proposal currdecision;
+                                while(decisions_.find(slot_num_)!=decisions_.end())
+                                {
+                                    currdecision = decisions_[slot_num_];
+                                    if(proposals_.find(slot_num_)!=proposals_.end())
+                                    {
+                                        if(!(proposals_[slot_num_]==currdecision))
+                                            Propose(proposals_[slot_num_]);
+                                    }
+
+                                    Perform(slot_num_, currdecision);
+                                    //s has to slot_num. check if it is slotnum in recovery too.
+                                    //if so can remove argument from perform, sendresponse functions
+                                }
+                            }
+                            else {    //other messages
+                                D(cout << "Unexpected message in Replica " << msg << endl;)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+      }
+}
 /**
  * function for the thread receiving messages from a client with id=client_id
  * @param _rcv_thread_arg argument containing server object and client_id
@@ -164,8 +299,14 @@ void *ReplicaEntry(void *_S) {
         S->CreateReceiveThreadsForClients();
     }
 
+
+    S->Replica();
+
+
     void *status;
     pthread_join(accept_connections_thread, &status);
+
+
     return NULL;
 
 }
