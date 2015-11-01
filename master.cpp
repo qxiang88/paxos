@@ -1,5 +1,6 @@
 #include "master.h"
 #include "constants.h"
+#include "utilities.h"
 #include "iostream"
 #include "vector"
 #include "string"
@@ -23,7 +24,6 @@ using namespace std;
 #endif // DEBUG
 
 extern char **environ;
-extern std::vector<string> split(const std::string &s, char delim);
 
 int Master::get_server_fd(const int server_id) {
     return server_fd_[server_id];

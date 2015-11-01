@@ -1,5 +1,6 @@
 #include "server.h"
 #include "constants.h"
+#include "utilities.h"
 #include "iostream"
 #include "vector"
 #include "string"
@@ -9,6 +10,7 @@
 #include "signal.h"
 #include "errno.h"
 #include "sys/socket.h"
+#include "limits.h"
 using namespace std;
 
 typedef pair<int, Proposal> SPtuple;
@@ -25,37 +27,6 @@ extern void* AcceptConnectionsServer(void* _S);
 void *ReplicaEntry(void *_S);
 void *AcceptorEntry(void *_S);
 void *LeaderEntry(void *_S);
-extern std::vector<string> split(const std::string &s, char delim);
-extern void CreateThread(void* (*f)(void* ), void* arg, pthread_t &thread);
-
-bool Ballot::operator>(const Ballot &b2) const {
-    if (this->seq_num > b2.seq_num)
-        return true;
-    else if (this->seq_num < b2.seq_num)
-        return false;
-    else if (this->seq_num == b2.seq_num) {
-        if (this->id > b2.id)
-            return true;
-        else
-            return false;
-    }
-}
-
-bool Ballot::operator<(const Ballot &b2) const {
-    return !((*this) >= b2);
-}
-
-bool Ballot::operator==(const Ballot &b2) const {
-    return ((this->seq_num == b2.seq_num) && (this->id == b2.id));
-}
-
-bool Ballot::operator>=(const Ballot &b2) const {
-    return ((*this) == b2 || (*this) > b2);
-}
-
-bool Ballot::operator<=(const Ballot &b2) const {
-    return !((*this) > b2);
-}
 
 int Server::get_pid() {
     return pid_;
@@ -83,6 +54,10 @@ int Server::get_primary_id() {
 
 int Server::get_slot_num() {
     return slot_num_;
+}
+
+int Server::get_num_servers() {
+    return num_servers_;
 }
 
 Ballot Server::get_ballot_num() {
@@ -235,10 +210,80 @@ void Server::Initialize(const int pid,
     leader_port_.resize(num_servers_);
 }
 
+
+fd_set Server::GetAcceptorFdSet()
+{
+    fd_set acceptor_set;
+    int fd_max = INT_MIN, fd_temp;
+    FD_ZERO(&acceptor_set);
+    for (int i = 0; i < get_num_servers(); i++) {
+        fd_temp = get_acceptor_fd(i);
+        FD_SET(fd_temp, &acceptor_set);
+        fd_max = max(fd_max, fd_temp);
+    }
+    return acceptor_set;
+}
+
+int Server::GetMaxAcceptorFd()
+{
+    int fd_max = INT_MIN, fd_temp;
+    for (int i = 0; i < get_num_servers(); i++) {
+        fd_temp = get_acceptor_fd(i);
+        fd_max = max(fd_max, fd_temp);
+    }
+    return fd_max;
+}
+
+void Server::SendToServers(const string& type, const string& msg)
+{
+    int serv_fd;
+    for (int i = 0; i < num_servers_; i++)
+    {
+        // if(i==get_pid())
+        // {
+        // if(type==kDecision)
+        // serv_fd = get_replica_fd();
+        // else if(type==kP2a || type==kP1a)
+        // serv_fd = get_self_acceptor_fd();
+        // }
+        // else{
+        if (type == kDecision)
+            serv_fd = get_replica_fd(i);
+        else if (type == kP2a || type == kP1a)
+            serv_fd = get_acceptor_fd(i);
+        // }
+
+        if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
+            D(cout << ": ERROR: sending to " << (i) << endl;)
+        }
+        else {
+            D(cout << ": Msg sent to " << (i) << endl;)
+        }
+    }
+}
+
+
+void Server::SendToLeader(const string&msg)
+{
+    int serv_fd = get_leader_fd(get_pid());
+    if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
+        D(cout << ": ERROR: sending to leader" << endl;)
+    }
+    else {
+        D(cout << ": Msg sent to leader" << endl;)
+    }
+}
+
+void Server::SendPreEmpted(const Ballot& b)
+{
+    string msg = kPreEmpted + kInternalDelim + ballotToString(b) + kMessageDelim;
+    SendToLeader(msg);
+}
+
 int main(int argc, char *argv[]) {
     Server S;
     S.Initialize(atoi(argv[1]), atoi(argv[2]), atoi(argv[3]));
-    if (!S.ReadPortsFile()){
+    if (!S.ReadPortsFile()) {
         return 1;
     }
 
@@ -249,7 +294,7 @@ int main(int argc, char *argv[]) {
         S.CommanderAcceptThread();
         S.ScoutAcceptThread();
     }
-    
+
     pthread_t replica_thread;
     CreateThread(ReplicaEntry, (void*)&S, replica_thread);
 

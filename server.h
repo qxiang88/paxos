@@ -2,45 +2,14 @@
 #define SERVER_H_
 #include "vector"
 #include "string"
+#include "unordered_set"
 #include "map"
+#include "utilities.h"
 using namespace std;
 
 void* ReceiveMessagesFromClient(void* _rcv_thread_arg);
-
-struct Proposal {
-    string client_id;
-    string chat_id;
-    string msg;
-
-    Proposal() { }
-    Proposal(const string &client_id,
-             const string &chat_id,
-             const string &msg)
-        : client_id(client_id),
-          chat_id(chat_id),
-          msg(msg) { }
-};
-
-struct Ballot {
-    int id;
-    int seq_num;
-
-    Ballot() { }
-    Ballot(int i, int s): id(i), seq_num(s) {}
-
-    bool operator>(const Ballot &b2) const;
-    bool operator<(const Ballot &b2) const;
-    bool operator==(const Ballot &b2) const;
-    bool operator>=(const Ballot &b2) const;
-    bool operator<=(const Ballot &b2) const;
-
-};
-
-struct Triple {
-    Ballot b;
-    int s;
-    Proposal p;
-};
+void* Commander(void* _rcv_thread_arg);
+void* Scout(void* _rcv_thread_arg);
 
 class Server {
 public:
@@ -54,6 +23,18 @@ public:
     bool ReadPortsFile();
     void CreateReceiveThreadsForClients();
     bool ConnectToServer(const int server_id);
+
+    void SendP1a(const Ballot& b);
+    void SendP2a(const Triple& t);
+    void SendDecision(const Triple& t);
+    void SendAdopted(const Ballot& recvd_ballot, unordered_set<Triple> pvalues);
+    void SendPreEmpted(const Ballot& b);
+
+    void SendToServers(const string& type, const string& msg);
+    void SendToLeader(const string&);
+    int GetMaxAcceptorFd();
+    fd_set GetAcceptorFdSet();
+
     void IncrementSlotNum();
     void IncrementBallotNum();
     void CommanderAcceptThread();
@@ -66,6 +47,8 @@ public:
     bool ConnectToScoutR(const int server_id);
     bool ConnectToScoutA(const int server_id);
     bool ConnectToReplica(const int server_id);
+    void Leader();
+    void Acceptor();
 
 
     int get_pid();
@@ -74,6 +57,7 @@ public:
     int get_replica_fd(const int server_id);
     int get_acceptor_fd(const int server_id);
     int get_leader_fd(const int server_id);
+    int get_num_servers();
     int get_client_chat_fd(const int client_id);
     int get_master_port();
     int get_server_listen_port(const int server_id);
@@ -107,7 +91,9 @@ private:
     int num_clients_;
     int primary_id_;
     int slot_num_;
+
     Ballot ballot_num_;
+    bool leader_active_;
 
     std::map<int, Proposal> proposals_;  // map of s,Proposal
     std::map<int, Proposal> decisions_;
@@ -143,5 +129,24 @@ struct ReceiveThreadArgument {
     Server *S;
     int client_id;
 };
+
+struct CommanderThreadArgument {
+    Server *S;
+    Triple *toSend;
+};
+
+struct ScoutThreadArgument {
+    Server *S;
+    Ballot *ball;
+};
+
+struct LeaderThreadArgument {
+    Server *S;
+};
+
+struct AcceptorThreadArgument {
+    Server *S;
+};
+
 
 #endif //SERVER_H_

@@ -1,5 +1,6 @@
 #include "server.h"
 #include "constants.h"
+#include "utilities.h"
 #include "iostream"
 #include "vector"
 #include "string"
@@ -9,6 +10,7 @@
 #include "signal.h"
 #include "errno.h"
 #include "sys/socket.h"
+#include "limits.h"
 using namespace std;
 
 typedef pair<int, Proposal> SPtuple;
@@ -20,9 +22,6 @@ typedef pair<int, Proposal> SPtuple;
 #else
 #  define D(x)
 #endif // DEBUG
-
-extern std::vector<string> split(const std::string &s, char delim);
-extern void CreateThread(void* (*f)(void* ), void* arg, pthread_t &thread);
 
 int Server::get_acceptor_fd(const int server_id) {
     return acceptor_fd_[server_id];
@@ -51,6 +50,7 @@ int Server::IsAcceptorPort(const int port) {
         return -1;
     }
 }
+
 /**
  * thread entry function for acceptor
  * @param  _S pointer to server class object
@@ -80,6 +80,17 @@ void *AcceptorEntry(void *_S) {
           << S->get_primary_id() << endl;)
         return NULL;
     }
+}
 
+void Server::Acceptor()
+{
+
+}
+
+//actually leader thread for each replica required. but here only one replica sends leader anything
+void* AcceptorThread(void* _rcv_thread_arg) {
+    AcceptorThreadArgument *rcv_thread_arg = (AcceptorThreadArgument *)_rcv_thread_arg;
+    Server *S = rcv_thread_arg->S;
+    S->Acceptor();
     return NULL;
 }

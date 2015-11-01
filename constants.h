@@ -26,8 +26,20 @@ const string kClientExecutable = "./client";
 // message templates
 const string kMessageDelim = "$";
 const string kInternalDelim = "-";
+const string kInternalStructDelim = ".";
+const string kInternalSetDelim = ",";
 const string kChat = "CHAT";
 const string kChatLog = "CHATLOG";
+
+
+const string kP1a = "P1A";
+const string kP2a = "P2A";
+const string kP1b = "P1B";
+const string kP2b = "P2B";
+const string kDecision = "DECISION";
+const string kPreEmpted = "PREEMPTED";
+const string kAdopted = "ADOPTED";
+const string kPropose = "PROPOSE";
 
 // sleep values
 const time_t kGeneralSleep = 1000 * 1000;

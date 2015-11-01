@@ -1,5 +1,6 @@
 #include "server.h"
 #include "constants.h"
+#include "utilities.h"
 #include "iostream"
 #include "vector"
 #include "string"
@@ -22,8 +23,6 @@ typedef pair<int, Proposal> SPtuple;
 #endif // DEBUG
 
 extern void* AcceptConnectionsReplica(void* _S);
-extern std::vector<string> split(const std::string &s, char delim);
-extern void CreateThread(void* (*f)(void* ), void* arg, pthread_t &thread);
 
 int Server::get_replica_fd(const int server_id) {
     return replica_fd_[server_id];

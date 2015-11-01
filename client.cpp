@@ -1,4 +1,5 @@
 #include "client.h"
+#include "utilities.h"
 #include "constants.h"
 #include "iostream"
 #include "vector"
@@ -20,8 +21,6 @@ using namespace std;
 #endif // DEBUG
 
 extern void* AcceptConnections(void* _C);
-extern std::vector<string> split(const std::string &s, char delim);
-extern void CreateThread(void* (*f)(void* ), void* arg, pthread_t &thread);
 
 pthread_mutex_t final_chat_log_lock;
 
@@ -103,10 +102,10 @@ bool Client::ReadPortsFile() {
         }
 
         for (int i = 0; i < num_servers_; i++) {
-            fin>>port>>port>>port;
-            fin>>port;
+            fin >> port >> port >> port;
+            fin >> port;
             primary_listen_port_[i] = port;
-            fin>>port>>port>>port;
+            fin >> port >> port >> port;
         }
 
         fin.close();
