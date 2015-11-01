@@ -39,6 +39,7 @@ const string kP2b = "P2B";
 const string kDecision = "DECISION";
 const string kPreEmpted = "PREEMPTED";
 const string kAdopted = "ADOPTED";
+const string kPropose = "PROPOSE";
 
 // sleep values
 const time_t kGeneralSleep = 1000 * 1000;

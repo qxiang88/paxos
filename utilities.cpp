@@ -170,6 +170,55 @@ Ballot stringToBallot(const string& s)
     return b;
 }
 
+Proposal stringToProposal(const string& s)
+{
+    Proposal p;
+    vector<string> parts = split(s, kInternalStructDelim[0]);
+    p.client_id = parts[0];
+    p.chat_id = parts[1];
+    p.msg = parts[2];
+    return p;
+}
+
+map<int, Proposal> pmax(const unordered_set<Triple> &pvalues)
+{
+    map<int, Proposal> rval;
+    // set<int> slot_added;
+    for(auto it=pvalues.begin(); it!=pvalues.end(); it++)
+    {
+        if(rval.find(it->s)==rval.end())
+        {
+            Ballot b_max = it->b;
+            Proposal p_max = it->p;
+            for(auto it2 = pvalues.begin(); it2!=pvalues.end(); it2++)
+            {
+                if(it2->s != it->s)continue;
+
+                if(it2->b > b_max)
+                {
+                    b_max = it2->b;
+                    p_max = it2->p;
+                }
+            }
+            rval[it->s] = p_max;
+        }
+    }
+    return rval;
+}
+
+map<int, Proposal> pairxor(const map<int, Proposal> &x,const map<int, Proposal> &y)
+{
+    map<int, Proposal> rval = y; 
+    for(auto itx = x.begin(); itx!=x.end(); itx++)
+    {
+        auto it = y.find(itx->first);
+        if(it==y.end())
+        {
+            rval[itx->first] = itx->second;
+        }
+    }
+    return rval;
+}
 
 /**
  * creates a new thread

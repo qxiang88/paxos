@@ -10,21 +10,6 @@ using namespace std;
 void* ReceiveMessagesFromClient(void* _rcv_thread_arg);
 void* Commander(void* _rcv_thread_arg);
 void* Scout(void* _rcv_thread_arg);
-// struct hashing_fn
-// {
-//     size_t operator() (const Proposal& p) const;
-//     size_t operator() (const Ballot& p) const;
-//     size_t operator() (const Triple& p) const;
-    
-// };
-
-// struct BallotHash
-// {
-// };
-
-// struct TripleHash
-// {
-// };
 
 class Server {
 public:
@@ -42,11 +27,12 @@ public:
     void SendP2a(const Triple& t);
     void SendDecision(const Triple& t);
     void SendAdopted(const Ballot& recvd_ballot, unordered_set<Triple> pvalues);
+    void SendPreEmpted(const Ballot& b);
+
     void SendToServers(const string& type, const string& msg);
+    void SendToLeader(const string&);
     int GetMaxAcceptorFd();
     fd_set GetAcceptorFdSet();
-    void SendToLeader(const string&);
-    void SendPreEmpted(const Ballot& b);
 
 
     void IncrementSlotNum();
@@ -88,7 +74,9 @@ private:
     int num_clients_;
     int leader_id_;
     int slot_num_;
+    
     Ballot ballot_num_;
+    bool leader_active_;
 
     std::map<int, Proposal> proposals_;  // map of s,Proposal
     std::map<int, Proposal> decisions_;
@@ -121,6 +109,14 @@ struct CommanderThreadArgument {
 struct ScoutThreadArgument {
     Server *S;
     Ballot *ball;
+};
+
+struct LeaderThreadArgument {
+    Server *S;
+};
+
+struct AcceptorThreadArgument {
+    Server *S;
 };
 
 

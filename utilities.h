@@ -7,6 +7,7 @@
 #include "iostream"
 #include "constants.h"
 #include "unordered_set"
+#include "map"
 
 using namespace std;
 
@@ -74,6 +75,8 @@ struct Triple {
     int s;
     Proposal p;
 
+    // Triple(Ballot barg, int sarg, Proposal parg): b(barg), s(sarg), p(parg){}
+    
     bool operator==(const Triple &t2) const;
 };
 
