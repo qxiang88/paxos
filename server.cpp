@@ -55,6 +55,14 @@ int Server::get_leader_id() {
     return leader_id_;
 }
 
+int Server::get_slot_num() {
+    return slot_num_;
+}
+
+Ballot Server::get_ballot_num() {
+    return ballot_num_;
+}
+
 void Server::set_server_paxos_fd(const int server_id, const int fd) {
     if (fd == -1 || server_paxos_fd_[server_id] == -1)
         server_paxos_fd_[server_id] = fd;
@@ -76,6 +84,31 @@ void Server::set_master_fd(const int fd) {
 
 void Server::set_leader_id(const int leader_id) {
     leader_id_ = leader_id;
+}
+
+void Server::set_slot_num(const int slot_num) {
+    slot_num_ = slot_num;
+}
+
+void Server::set_ballot_num(const Ballot &ballot_num) {
+    ballot_num_.id = ballot_num.id;
+    ballot_num_.seq_num = ballot_num.seq_num;
+}
+
+/**
+ * increments the value of slot_num_
+ */
+void Server::IncrementSlotNum() {
+    set_slot_num(get_slot_num() + 1);
+}
+
+/**
+ * increments the value of ballot_num_
+ */
+void Server::IncrementBallotNum() {
+    Ballot b = get_ballot_num();
+    b.seq_num++;
+    set_ballot_num(b);
 }
 
 /**
@@ -161,6 +194,8 @@ void Server::Initialize(const int pid,
                         const int num_clients) {
     set_pid(pid);
     set_leader_id(0);
+    set_slot_num(0);
+    set_ballot_num(Ballot(pid, 0));
     num_servers_ = num_servers;
     num_clients_ = num_clients;
     server_paxos_fd_.resize(num_servers_, -1);
@@ -205,7 +240,7 @@ void Server::CreateReceiveThreadsForClients() {
 
 /**
  * function for the thread receiving messages from a client with id=client_id
- * @param _rcv_thread_arg argument containing server object and client_id 
+ * @param _rcv_thread_arg argument containing server object and client_id
  */
 void* ReceiveMessagesFromClient(void* _rcv_thread_arg) {
     ReceiveThreadArgument *rcv_thread_arg = (ReceiveThreadArgument *)_rcv_thread_arg;
@@ -219,21 +254,31 @@ void* ReceiveMessagesFromClient(void* _rcv_thread_arg) {
         num_bytes = recv(S->get_client_chat_fd(client_id), buf, kMaxDataSize - 1, 0);
         if (num_bytes == -1) {
             D(cout << "S" << S->get_pid() << ": ERROR in receiving message from C"
-                 << client_id << endl;)
+              << client_id << endl;)
             return NULL;
         } else if (num_bytes == 0) {    // connection closed by client
             D(cout << "S" << S->get_pid() << ": ERROR: Connection closed by Client." << endl;)
             return NULL;
         } else {
             buf[num_bytes] = '\0';
-            D(cout << "S" << S->get_pid() << ": Message received from C" << client_id << " - " << buf << endl;)
+            D(cout << "S" << S->get_pid() << ": Message received from C"
+              << client_id << " - " << buf << endl;)
 
             // extract multiple messages from the received buf
             std::vector<string> message = split(string(buf), kMessageDelim[0]);
             for (const auto &msg : message) {
                 std::vector<string> token = split(string(msg), kInternalDelim[0]);
-                // token[0] is chat_id
-                // token[1] is the chat message
+                // token[0] is the CHAT tag
+                // token[1] is client id
+                // token[2] is chat_id
+                // token[3] is the chat message
+                if (token[0] == kChat) {
+
+                } else {
+                    D(cout << "S" << S->get_pid()
+                      << ": ERROR Unexpected message received from C" << client_id
+                      << " - " << buf << endl;)
+                }
             }
         }
     }

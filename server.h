@@ -7,6 +7,30 @@ using namespace std;
 
 void* ReceiveMessagesFromClient(void* _rcv_thread_arg);
 
+struct Command {
+    int client_id;
+    int chat_id;
+    string msg;
+};
+
+struct Ballot {
+    int id;
+    int seq_num;
+
+    Ballot() {
+        id = -1;
+        seq_num = -1;
+    };
+    
+    Ballot(int i, int s): id(i), seq_num(s) {}
+};
+
+struct Triple {
+    Ballot b;
+    int s;
+    Command p;
+};
+
 class Server {
 public:
     void Initialize(const int pid,
@@ -18,6 +42,8 @@ public:
     void CreateReceiveThreadsForClients();
     bool ConnectToServer(const int server_id);
     void ConnectToOtherServers();
+    void IncrementSlotNum();
+    void IncrementBallotNum();
 
     int get_pid();
     int get_server_paxos_fd(const int server_id);
@@ -27,18 +53,27 @@ public:
     int get_client_listen_port(const int client_id);
     int get_server_paxos_port(const int server_id);
     int get_leader_id();
+    int get_slot_num();
+    Ballot get_ballot_num();
 
     void set_server_paxos_fd(const int server_id, const int fd);
     void set_client_chat_fd(const int client_id, const int fd);
     void set_pid(const int pid);
     void set_master_fd(const int fd);
     void set_leader_id(const int leader_id);
+    void set_slot_num(const int slot_num);
+    void set_ballot_num(const Ballot &ballot_num);
 
 private:
     int pid_;   // server's ID
     int num_servers_;
     int num_clients_;
     int leader_id_;
+    int slot_num_;
+    Ballot ballot_num_;
+
+    std::map<int, Command> proposals_;
+    std::map<int, Command> decisions_;
 
     int master_fd_;
     std::vector<int> server_paxos_fd_;
