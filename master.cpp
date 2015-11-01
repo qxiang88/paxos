@@ -53,8 +53,8 @@ int Master::get_client_pid(const int client_id) {
     return client_pid_[client_id];
 }
 
-int Master::get_leader_id() {
-    return leader_id_;
+int Master::get_primary_id() {
+    return primary_id_;
 }
 
 void Master::set_server_pid(const int server_id, const int pid) {
@@ -73,8 +73,8 @@ void Master::set_client_fd(const int client_id, const int fd) {
     client_fd_[client_id] = fd;
 }
 
-void Master::set_leader_id(const int leader_id) {
-    leader_id_ = leader_id;
+void Master::set_primary_id(const int primary_id) {
+    primary_id_ = primary_id;
 }
 
 /**
@@ -119,14 +119,18 @@ bool Master::ReadPortsFile() {
         fin >> master_port_;
 
         int port;
-        for (int i = 0; i < num_servers_; i++) {
-            fin >> port;
-            server_listen_port_[i] = port;
-        }
-
         for (int i = 0; i < num_clients_; i++) {
             fin >> port;
             client_listen_port_[i] = port;
+            fin >> port;
+        }
+
+        for (int i = 0; i < num_servers_; i++) {
+            fin >> port;
+            server_listen_port_[i] = port;
+            for (int j = 0; j < 6; ++j) {
+                fin>>port;
+            }
         }
         fin.close();
         return true;
@@ -216,8 +220,8 @@ void Master::ReceiveChatLogFromClient(const int client_id, string &chat_log) {
  */
 void Master::PrintChatLog(const string &chat_log) {
     std::vector<string> token = split(chat_log, kMessageDelim[0]);
-    for (int i=0; (i+2)<token.size(); i=i+3) {
-        cout<<token[i]<<" "<<token[i+1]<<": "<<token[i+2]<<endl;
+    for (int i = 0; (i + 2) < token.size(); i = i + 3) {
+        cout << token[i] << " " << token[i + 1] << ": " << token[i + 2] << endl;
     }
 }
 
@@ -225,7 +229,7 @@ void Master::PrintChatLog(const string &chat_log) {
  * initialize data members and resize vectors
  */
 void Master::Initialize() {
-    set_leader_id(0);
+    set_primary_id(0);
     server_pid_.resize(num_servers_, -1);
     client_pid_.resize(num_clients_, -1);
     server_fd_.resize(num_servers_, -1);
@@ -265,8 +269,8 @@ bool Master::SpawnServers(const int n) {
             D(cout << "M: Spawed server S" << i << endl;)
             set_server_pid(i, pid);
         } else {
-            D(cout << "M: ERROR: Cannot spawn server S")
-                    << i << " - " << strerror(status) << endl;
+            D(cout << "M: ERROR: Cannot spawn server S"
+                    << i << " - " << strerror(status) << endl);
             return false;
         }
     }

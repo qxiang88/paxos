@@ -33,16 +33,16 @@ int Client::get_master_fd() {
     return master_fd_;
 }
 
-int Client::get_leader_fd() {
-    return leader_fd_;
+int Client::get_primary_fd() {
+    return primary_fd_;
 }
 
 int Client::get_master_port() {
     return master_port_;
 }
 
-int Client::get_server_listen_port(const int server_id) {
-    return server_listen_port_[server_id];
+int Client::get_primary_listen_port(const int server_id) {
+    return primary_listen_port_[server_id];
 }
 
 int Client::get_my_chat_port() {
@@ -53,8 +53,8 @@ int Client::get_my_listen_port() {
     return my_listen_port_;
 }
 
-int Client::get_leader_id() {
-    return leader_id_;
+int Client::get_primary_id() {
+    return primary_id_;
 }
 
 void Client::set_pid(const int pid) {
@@ -65,12 +65,12 @@ void Client::set_master_fd(const int fd) {
     master_fd_ = fd;
 }
 
-int Client::set_leader_fd(const int fd) {
-    leader_fd_ = fd;
+int Client::set_primary_fd(const int fd) {
+    primary_fd_ = fd;
 }
 
-int Client::set_leader_id(const int leader_id) {
-    leader_id_ = leader_id;
+int Client::set_primary_id(const int primary_id) {
+    primary_id_ = primary_id;
 }
 
 /**
@@ -91,29 +91,22 @@ bool Client::ReadPortsFile() {
         fin >> master_port_;
 
         int port;
-        for (int i = 0; i < num_servers_; i++) {
-            fin >> port;
-            server_listen_port_[i] = port;
-        }
-
         for (int i = 0; i < num_clients_; i++) {
-            fin >> port;
             if (i == get_pid()) {
+                fin >> port;
                 my_listen_port_ = port;
+                fin >> port;
+                my_chat_port_ = port;
+            } else {
+                fin >> port >> port;
             }
         }
 
         for (int i = 0; i < num_servers_; i++) {
-            fin >> port;
-            // server_paxos_port
-            // client doesn't need this info
-        }
-
-        for (int i = 0; i < num_clients_; i++) {
-            fin >> port;
-            if (i == get_pid()) {
-                my_chat_port_ = port;
-            }
+            fin>>port>>port>>port;
+            fin>>port;
+            primary_listen_port_[i] = port;
+            fin>>port>>port>>port;
         }
 
         fin.close();
@@ -136,31 +129,31 @@ void Client::Initialize(const int pid,
                         const int num_servers,
                         const int num_clients) {
     set_pid(pid);
-    set_leader_id(0);
+    set_primary_id(0);
     num_servers_ = num_servers;
     num_clients_ = num_clients;
-    server_listen_port_.resize(num_servers_);
+    primary_listen_port_.resize(num_servers_);
 }
 
 /**
- * sends chat message to leader along with chat id
+ * sends chat message to primary along with chat id
  * @param chat_id      id of the chat message
  * @param chat_message body of chat message
  */
-void Client::SendChatToLeader(const int chat_id, const string &chat_message) {
+void Client::SendChatToPrimary(const int chat_id, const string &chat_message) {
     string msg = kChat + kInternalDelim +
                  to_string(get_pid()) + kInternalDelim +
                  to_string(chat_id) + kInternalDelim +
                  chat_message + kMessageDelim;
-    int leader_id = get_leader_id();
-    if (send(get_leader_fd(), msg.c_str(), msg.size(), 0) == -1) {
-        D(cout << "C" << get_pid() << ": ERROR: Cannot send chat message to leader S"
-          << leader_id << endl;)
-        //TODO: Need to take some action like increment leader_id?
+    int primary_id = get_primary_id();
+    if (send(get_primary_fd(), msg.c_str(), msg.size(), 0) == -1) {
+        D(cout << "C" << get_pid() << ": ERROR: Cannot send chat message to primary S"
+          << primary_id << endl;)
+        //TODO: Need to take some action like increment primary_id?
         //or wait for update command from master?
     } else {
-        D(cout << "C" << get_pid() << ": Chat message sent to leader S"
-          << leader_id << ": " << msg << endl;)
+        D(cout << "C" << get_pid() << ": Chat message sent to primary S"
+          << primary_id << ": " << msg << endl;)
     }
 }
 
@@ -173,7 +166,7 @@ void Client::AddChatToChatList(const string &chat) {
 }
 
 /**
- * adds the chat message sent by the leader to final chat log
+ * adds the chat message sent by the primary to final chat log
  * @param sequence_num sequence number of chat message as assigned by Paxos
  * @param sender_index id of original sender of chat message
  * @param body         chat message body
@@ -267,7 +260,7 @@ void* ReceiveMessagesFromMaster(void* _C) {
                 if (token[0] == kChat) {   // new chat message received from master
                     D(cout << "C" << C->get_pid() << ": Chat message received from M: " << token[1] <<  endl;)
                     C->AddChatToChatList(token[1]);
-                    C->SendChatToLeader(C->ChatListSize() - 1, token[1]);
+                    C->SendChatToPrimary(C->ChatListSize() - 1, token[1]);
                 } else if (token[0] == kChatLog) {  // chat log request from master
                     D(cout << "C" << C->get_pid() << ": ChatLog request received from M: " <<  endl;)
                     C->SendChatLogToMaster();
@@ -281,29 +274,29 @@ void* ReceiveMessagesFromMaster(void* _C) {
 }
 
 /**
- * function for client's receive messages from leader thread
+ * function for client's receive messages from primary thread
  * the recv calls times-out every kReceiveTimeoutTimeval
- * so that it can potentially start receiving from a new leader
- * and not remain stuck in recv waiting from an old dead leader
+ * so that it can potentially start receiving from a new primary
+ * and not remain stuck in recv waiting from an old dead primary
  * @param _C object of Client class
  */
-void* ReceiveMessagesFromLeader(void* _C) {
+void* ReceiveMessagesFromPrimary(void* _C) {
     Client* C = (Client*)_C;
     char buf[kMaxDataSize];
     int num_bytes;
 
     while (true) {  // always listen to messages from the master
-        int leader_id = C->get_leader_id();
-        int leader_fd = C->get_leader_fd();
+        int primary_id = C->get_primary_id();
+        int primary_fd = C->get_primary_fd();
 
         // recv call times out after kReceiveTimeoutTimeval
-        num_bytes = recv(leader_fd, buf, kMaxDataSize - 1, 0);
+        num_bytes = recv(primary_fd, buf, kMaxDataSize - 1, 0);
         if (num_bytes == -1) {
             // D(cout << "C" << C->get_pid() <<
-            // ": ERROR in receiving message from leader S" << leader_id << endl;)
-        } else if (num_bytes == 0) {    // connection closed by leader
-            // D(cout << "C" << C->get_pid() << ": Connection closed by leader S" << leader_id << endl;)
-            //TODO: Need to take some action like increment leader_id?
+            // ": ERROR in receiving message from primary S" << primary_id << endl;)
+        } else if (num_bytes == 0) {    // connection closed by primary
+            // D(cout << "C" << C->get_pid() << ": Connection closed by primary S" << primary_id << endl;)
+            //TODO: Need to take some action like increment primary_id?
             //or wait for update command from master?
         } else {
             buf[num_bytes] = '\0';
@@ -335,19 +328,19 @@ int main(int argc, char *argv[]) {
     void* status;
     pthread_join(accept_connections_thread, &status);
 
-    if (C.ConnectToLeader()) {
-        D(cout << "C" << C.get_pid() << ": Connected to leader S" << C.get_leader_id() << endl;)
+    if (C.ConnectToPrimary()) {
+        D(cout << "C" << C.get_pid() << ": Connected to primary S" << C.get_primary_id() << endl;)
     } else {
-        D(cout << "C" << C.get_pid() << ": ERROR in connecting to leader S" << C.get_leader_id() << endl;)
-        //TODO: Need to take some action like increment leader_id?
+        D(cout << "C" << C.get_pid() << ": ERROR in connecting to primary S" << C.get_primary_id() << endl;)
+        //TODO: Need to take some action like increment primary_id?
         //or wait for update command from master?
     }
 
     pthread_t receive_from_master_thread;
     CreateThread(ReceiveMessagesFromMaster, (void*)&C, receive_from_master_thread);
 
-    pthread_t receive_from_leader_thread;
-    CreateThread(ReceiveMessagesFromLeader, (void*)&C, receive_from_leader_thread);
+    pthread_t receive_from_primary_thread;
+    CreateThread(ReceiveMessagesFromPrimary, (void*)&C, receive_from_primary_thread);
 
     pthread_join(receive_from_master_thread, &status);
     return 0;

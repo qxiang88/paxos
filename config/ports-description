@@ -1,0 +1,36 @@
+55555 // master port
+
+
+44000   //client 0 listen
+55000   //client 0 chat
+
+44001   //client 1 listen
+55001   //client 1 chat
+
+44002   //client 2 listen
+55002   //client 2 chat
+
+
+11000   //server 0 listen
+12000   //commander 0 listen
+13000   //scout 0 listen
+14000   //replica 0 listen
+15000   //acceptor 0
+16000   //replica 0
+17000   //leader 0
+
+11001   //server 1 listen
+12001   //commander 1 listen
+13001   //scout 1 listen
+14001   //replica 1 listen
+15001   //acceptor 1
+16001   //replica 1
+17001   //leader 1
+
+11002   //server 2 listen
+12002   //commander 2 listen
+13002   //scout 2 listen
+14002   //replica 2 listen
+15002   //acceptor 2
+16002   //replica 2
+17002   //leader 2

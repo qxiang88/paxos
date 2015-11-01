@@ -21,30 +21,14 @@ using namespace std;
 #  define D(x)
 #endif // DEBUG
 
-/**
- * returns port number
- * @param  sa sockaddr structure
- * @return    port number contained in sa
- */
-int return_port_no(struct sockaddr *sa) {
-    if (sa->sa_family == AF_INET) {
-        return (((struct sockaddr_in*)sa)->sin_port);
-    }
-
-    return (((struct sockaddr_in6*)sa)->sin6_port);
-}
-
-void sigchld_handler(int s) {
-    int saved_errno = errno;
-    while (waitpid(-1, NULL, WNOHANG) > 0);
-    errno = saved_errno;
-}
+extern int return_port_no(struct sockaddr *sa);
+extern void sigchld_handler(int s);
 
 /**
- * function for server's accept connections thread
+ * function for scout's accept connections thread
  * @param _S Pointer to server class object
  */
-void* AcceptConnectionsServer(void* _S) {
+void* AcceptConnectionsScout(void* _S) {
     Server *S = (Server *)_S;
 
     int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
@@ -60,7 +44,7 @@ void* AcceptConnectionsServer(void* _S) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(S->get_server_listen_port(S->get_pid())).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(S->get_scout_listen_port(S->get_pid())).c_str(),
                           &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         exit (1);
@@ -120,12 +104,23 @@ void* AcceptConnectionsServer(void* _S) {
 
         int incoming_port = ntohs(return_port_no((struct sockaddr *)&their_addr));
 
-        if (incoming_port == S->get_master_port()) { // incoming connection from master_port
-            S->set_master_fd(new_fd);
+        int process_id = S->IsLeaderPort(incoming_port);
+        if (process_id != -1) { //incoming connection from a leader
+            S->set_leader_fd(process_id, new_fd);
         } else {
-            D(cout << "S" << S->get_pid() << ": ERROR: Unexpected connect request from port "
-              << incoming_port << endl;)
+            process_id = S->IsReplicaPort(incoming_port);
+            if (process_id != -1) { //incoming connection from a replica
+                S->set_replica_fd(process_id, new_fd);
+            } else {
+                process_id = S->IsAcceptorPort(incoming_port);
+                if (process_id != -1) { //incoming connection from an acceptor
+                    S->set_acceptor_fd(process_id, new_fd);
+                } else {
+                    D(cout << "SS" << S->get_pid() << ": ERROR: Unexpected connect request from port "
+                      << incoming_port << endl;)
+                }
+            }
         }
+        pthread_exit(NULL);
     }
-    pthread_exit(NULL);
 }
