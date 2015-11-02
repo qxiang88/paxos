@@ -5,6 +5,7 @@
 #include "unordered_set"
 #include "map"
 #include "utilities.h"
+#include "set"
 using namespace std;
 
 void* ReceiveMessagesFromClient(void* _rcv_thread_arg);
@@ -34,6 +35,9 @@ public:
     void SendToLeader(const string&);
     int GetMaxAcceptorFd();
     fd_set GetAcceptorFdSet();
+    void AddToCommanderFdSet(const int fd);
+    void RemoveFromCommanderFdSet(const int fd);
+    void SendBackOwnFD(const int fd);
 
     void IncrementSlotNum();
     void IncrementBallotNum();
@@ -98,7 +102,7 @@ private:
     std::map<int, Proposal> proposals_;  // map of s,Proposal
     std::map<int, Proposal> decisions_;
     std::unordered_set<Triple> accepted_;
-    
+
     int master_fd_;
     std::vector<int> commander_fd_;
     std::vector<int> scout_fd_;
@@ -106,6 +110,7 @@ private:
     std::vector<int> acceptor_fd_;
     std::vector<int> leader_fd_;
     std::vector<int> client_chat_fd_;
+    std::set<int> commander_fd_set_;
 
     int master_port_;   // port used by master for communication
     std::vector<int> server_listen_port_;
@@ -113,6 +118,7 @@ private:
     std::vector<int> commander_listen_port_;
     std::vector<int> scout_listen_port_;
     std::vector<int> replica_listen_port_;
+    std::vector<int> acceptor_listen_port_;
 
     std::vector<int> client_chat_port_;
     std::vector<int> acceptor_port_;

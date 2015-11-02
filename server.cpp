@@ -203,6 +203,7 @@ void Server::Initialize(const int pid,
     commander_listen_port_.resize(num_servers_);
     scout_listen_port_.resize(num_servers_);
     replica_listen_port_.resize(num_servers_);
+    acceptor_listen_port_.resize(num_servers_);
 
     client_chat_port_.resize(num_clients_);
     acceptor_port_.resize(num_servers_);

@@ -22,6 +22,8 @@ typedef pair<int, Proposal> SPtuple;
 #else
 #  define D(x)
 #endif // DEBUG
+#
+extern void* AcceptConnectionsAcceptor(void* _S);
 
 int Server::get_acceptor_fd(const int server_id) {
     return acceptor_fd_[server_id];
@@ -34,6 +36,38 @@ int Server::get_acceptor_port(const int server_id) {
 void Server::set_acceptor_fd(const int server_id, const int fd) {
     if (fd == -1 || acceptor_fd_[server_id] == -1) {
         acceptor_fd_[server_id] = fd;
+    }
+}
+
+/**
+ * adds the fd for communication with a commander to commander_fd_set_
+ * @param fd fd to be added
+ */
+void Server::AddToCommanderFdSet(const int fd) {
+    commander_fd_set_.insert(fd);
+}
+
+/**
+ * removes the fd for communication with a commander from commander_fd_set_
+ * @param fd fd to be removed
+ */
+void Server::RemoveFromCommanderFdSet(const int fd) {
+    commander_fd_set_.erase(fd);
+}
+
+/**
+ * sends back the acceptor side's fd for commander-acceptor connection
+ * back to the commander
+ * @param fd acceptor side's fd for commander-acceptor connection
+ */
+void Server::SendBackOwnFD(const int fd) {
+    string msg = to_string(fd);
+    if (send(fd, msg.c_str(), msg.size(), 0) == -1) {
+        D(cout << "SA" << get_pid() << ": ERROR: Cannot send fd to commander" << endl;)
+        //TODO: delete this fd from the commander fd set?
+        RemoveFromCommanderFdSet(fd);
+    } else {
+        D(cout << "SA" << get_pid() << ": fd sent to commander" << endl;)
     }
 }
 
@@ -59,18 +93,19 @@ int Server::IsAcceptorPort(const int port) {
 void *AcceptorEntry(void *_S) {
     Server *S = (Server*) _S;
 
-    // does not need accept threads since it does not listen to connections from anyone
+    pthread_t accept_connections_thread;
+    CreateThread(AcceptConnectionsAcceptor, (void*)S, accept_connections_thread);
 
-    // sleep for some time to make sure accept threads of commanders and scouts are running
+    // sleep for some time to make sure accept threads of scouts are running
     usleep(kGeneralSleep);
-    if (S->ConnectToCommanderA(S->get_primary_id())) {
-        D(cout << "SA" << S->get_pid() << ": Connected to commander of S"
-          << S->get_primary_id() << endl;)
-    } else {
-        D(cout << "SA" << S->get_pid() << ": ERROR in connecting to commander of S"
-          << S->get_primary_id() << endl;)
-        return NULL;
-    }
+    // if (S->ConnectToCommanderA(S->get_primary_id())) {
+    //     D(cout << "SA" << S->get_pid() << ": Connected to commander of S"
+    //       << S->get_primary_id() << endl;)
+    // } else {
+    //     D(cout << "SA" << S->get_pid() << ": ERROR in connecting to commander of S"
+    //       << S->get_primary_id() << endl;)
+    //     return NULL;
+    // }
 
     if (S->ConnectToScoutA(S->get_primary_id())) {
         D(cout << "SA" << S->get_pid() << ": Connected to scout of S"
@@ -118,7 +153,7 @@ void Server::Acceptor()
     fd_max = max(fd_max, fd_temp);
     fds.insert(fd_temp);
     FD_SET(fd_temp, &subleaders);
-    
+
     while (true) {  // always listen to messages from the acceptors
         temp_set = subleaders;
         int rv = select(fd_max + 1, &temp_set, NULL, NULL, NULL);
@@ -126,36 +161,36 @@ void Server::Acceptor()
         if (rv == -1) { //error in select
             D(cout << "ERROR in select() for Acceptor" << endl;)
         } else if (rv == 0) {
-            D(cout<<"Unexpected select timeout in Acceptor"<<endl;)
+            D(cout << "Unexpected select timeout in Acceptor" << endl;)
             break;
         } else {
             for (int i = 0; i < 2; i++) {
                 if (FD_ISSET(fds[i], &temp_set)) { // we got one!!
                     char buf[kMaxDataSize];
                     if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1) {
-                        D(cout << "ERROR in receiving from scout or leader"<< endl;)
+                        D(cout << "ERROR in receiving from scout or leader" << endl;)
                         // pthread_exit(NULL); //TODO: think about whether it should be exit or not
                     } else if (num_bytes == 0) {     //connection closed
-                        D(cout << "Accepter connection for "<<get_pid()<<" closed by leader."<< endl;)
+                        D(cout << "Accepter connection for " << get_pid() << " closed by leader." << endl;)
                     } else {
                         buf[num_bytes] = '\0';
                         std::vector<string> message = split(string(buf), kMessageDelim[0]);
                         for (const auto &msg : message) {
                             std::vector<string> token = split(string(msg), kInternalDelim[0]);
-                            if (token[0] == kP1a) 
+                            if (token[0] == kP1a)
                             {
-                                D(cout << get_pid()<< " received P1a" << "message"<<  endl;)
+                                D(cout << get_pid() << " received P1a" << "message" <<  endl;)
 
                                 Ballot recvd_ballot = stringToBallot(token[2]);
                                 if (recvd_ballot > ballot_num_)
                                     ballot_num_ = recvd_ballot;
-                                
+
                                 SendP1b(recvd_ballot, accepted_);
 
                             }
-                            else if(token[0] == kP2a)
+                            else if (token[0] == kP2a)
                             {
-                                D(cout << get_pid()<< " received P2a" << "message"<<  endl;)
+                                D(cout << get_pid() << " received P2a" << "message" <<  endl;)
 
                                 Triple recvd_triple = stringToTriple(token[2]);
                                 if (recvd_triple.b >= ballot_num_)
@@ -174,7 +209,7 @@ void Server::Acceptor()
                 }
             }
         }
-      }
+    }
 }
 
 //have to create for each server

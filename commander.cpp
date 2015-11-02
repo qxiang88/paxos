@@ -33,9 +33,19 @@ int Server::get_commander_listen_port(const int server_id) {
     return commander_listen_port_[server_id];
 }
 
+int Server::get_acceptor_peer_fd(const int server_id) {
+    return acceptor_peer_fd_[server_id];
+}
+
 void Server::set_commander_fd(const int server_id, const int fd) {
     if (fd == -1 || commander_fd_[server_id] == -1) {
         commander_fd_[server_id] = fd;
+    }
+}
+
+void Server::set_acceptor_peer_fd(const int server_id, const int fd) {
+    if (fd == -1 || acceptor_peer_fd_[server_id] == -1) {
+        acceptor_peer_fd_[server_id] = fd;
     }
 }
 
@@ -61,11 +71,42 @@ void Server::SendDecision(const Triple & t)
     SendToServers(kDecision, msg);
 }
 
+void Server::ConnectToAllAcceptorsC(std::vector<int> &acceptor_peer_fd) {
+    for (int i = 0; i < num_servers_; ++i) {
+        if (!ConnectToAcceptor(i)) {
+            D(cout << "CS" << get_pid() << ": ERROR in connecting to acceptor S " << i << endl;)
+        } else {
+            int num_bytes;
+            char buf[kMaxDataSize];
+            num_bytes = recv(get_acceptor_fd(i), buf, kMaxDataSize - 1, 0);
+            if (num_bytes == -1) {
+                D(cout << "CS" << get_pid() <<
+                  ": ERROR in receiving fd from acceptor S " << i << endl;)
+                //TODO: should I close the acceptor_fd?
+                close(get_acceptor_fd(i));
+                set_acceptor_fd(i,-1);
+            } else if(num_bytes == 0) {
+                D(cout << "CS" << get_pid() <<
+                  ": Connection closed by acceptor S " << i << endl;)
+                //TODO: should I close the acceptor_fd?
+                close(get_acceptor_fd(i));
+                set_acceptor_fd(i,-1);
+            } else {
+                buf[num_bytes] = '\0';
+                // acceptor side fd of this connection received.
+                acceptor_peer_fd[i] = atoi(buf);
+            }
+        }
+    }
+}
 
 void* Commander(void* _rcv_thread_arg) {
     CommanderThreadArgument *rcv_thread_arg = (CommanderThreadArgument *)_rcv_thread_arg;
     Server *S = rcv_thread_arg->S;
     Triple * toSend = rcv_thread_arg->toSend;
+
+    std::vector<int> acceptor_peer_fd;
+    S->ConnectToAllAcceptors(acceptor_peer_fd);
 
     S->SendP2a(*toSend);
 

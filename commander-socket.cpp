@@ -112,10 +112,10 @@ void* AcceptConnectionsCommander(void* _S) {
             if (process_id != -1) { //incoming connection from a replica
                 S->set_replica_fd(process_id, new_fd);
             } else {
-                process_id = S->IsAcceptorPort(incoming_port);
-                if (process_id != -1) { //incoming connection from an acceptor
-                    S->set_acceptor_fd(process_id, new_fd);
-                } else {
+                // process_id = S->IsAcceptorPort(incoming_port);
+                // if (process_id != -1) { //incoming connection from an acceptor
+                //     S->set_acceptor_fd(process_id, new_fd);
+                // } else {
                     D(cout << "SC" << S->get_pid() << ": ERROR: Unexpected connect request from port "
                       << incoming_port << endl;)
                 }
@@ -123,4 +123,47 @@ void* AcceptConnectionsCommander(void* _S) {
         }
         pthread_exit(NULL);
     }
+}
+
+/**
+ * Connects to an acceptor
+ * @param server_id id of server whose acceptor to connect to
+ * @return  true if connection was successfull or already connected
+ */
+bool Server::ConnectToAcceptor(const int server_id) {
+    if (get_acceptor_fd(server_id) != -1) return true;
+
+    // set up addrinfo for server
+    int numbytes;
+    struct addrinfo *servinfo;
+    char s[INET6_ADDRSTRLEN];
+
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE; // use my IP
+    if ((rv = getaddrinfo(NULL, std::to_string(get_acceptor_listen_port(server_id)).c_str(),
+                          &hints, &servinfo)) != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+        return false;
+    }
+    // loop through all the results and connect to the first we can
+    for (l = servinfo; l != NULL; l = l->ai_next)
+    {
+        errno = 0;
+        if (connect(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
+            close(sockfd);
+            // if (errno == EBADF) cout << errno << endl;
+            continue;
+        }
+
+        break;
+    }
+    if (l == NULL) {
+        return false;
+    }
+    // int outgoing_port = ntohs(return_port_no((struct sockaddr *)l->ai_addr));
+    freeaddrinfo(servinfo); // all done with this structure
+    set_acceptor_fd(server_id, sockfd);
+    return true;
 }
