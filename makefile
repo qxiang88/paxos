@@ -25,34 +25,34 @@ server.o: server.cpp server.h constants.h utilities.h
 server-socket.o: server-socket.cpp server.h constants.h
 	g++ -g -std=c++0x -c server-socket.cpp
 
-replica.o: replica.cpp server.h constants.h utilities.h
+replica.o: replica.cpp replica.h server.h constants.h utilities.h
 	g++ -g -std=c++0x -c replica.cpp
 
-replica-socket.o: replica-socket.cpp server.h constants.h
+replica-socket.o: replica-socket.cpp replica.h server.h constants.h
 	g++ -g -std=c++0x -c replica-socket.cpp
 
-leader.o: leader.cpp server.h constants.h utilities.h
+leader.o: leader.cpp leader.h server.h constants.h utilities.h
 	g++ -g -std=c++0x -c leader.cpp
 
-leader-socket.o: leader-socket.cpp server.h constants.h
+leader-socket.o: leader-socket.cpp leader.h server.h constants.h
 	g++ -g -std=c++0x -c leader-socket.cpp
 
-acceptor.o: acceptor.cpp server.h constants.h utilities.h
+acceptor.o: acceptor.cpp acceptor.h server.h constants.h utilities.h
 	g++ -g -std=c++0x -c acceptor.cpp
 
-acceptor-socket.o: acceptor-socket.cpp server.h constants.h
+acceptor-socket.o: acceptor-socket.cpp acceptor.h server.h constants.h
 	g++ -g -std=c++0x -c acceptor-socket.cpp
 
-commander.o: commander.cpp server.h constants.h utilities.h
+commander.o: commander.cpp commander.h server.h constants.h utilities.h
 	g++ -g -std=c++0x -c commander.cpp
 
-commander-socket.o: commander-socket.cpp server.h constants.h
+commander-socket.o: commander-socket.cpp commander.h server.h constants.h
 	g++ -g -std=c++0x -c commander-socket.cpp
 
-scout.o: scout.cpp server.h constants.h utilities.h
+scout.o: scout.cpp scout.h server.h constants.h utilities.h
 	g++ -g -std=c++0x -c scout.cpp
 
-scout-socket.o: scout-socket.cpp server.h constants.h
+scout-socket.o: scout-socket.cpp scout.h server.h constants.h
 	g++ -g -std=c++0x -c scout-socket.cpp
 
 

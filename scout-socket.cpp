@@ -1,3 +1,4 @@
+#include "scout.h"
 #include "server.h"
 #include "constants.h"
 #include "iostream"
@@ -28,8 +29,8 @@ extern void sigchld_handler(int s);
  * function for scout's accept connections thread
  * @param _S Pointer to server class object
  */
-void* AcceptConnectionsScout(void* _S) {
-    Server *S = (Server *)_S;
+void* AcceptConnectionsScout(void* _SC) {
+    Scout *SC = (Scout *)_SC;
 
     int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
     struct addrinfo hints, *servinfo, *l;
@@ -44,7 +45,7 @@ void* AcceptConnectionsScout(void* _S) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(S->get_scout_listen_port(S->get_pid())).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(SC->S->get_scout_listen_port(SC->S->get_pid())).c_str(),
                           &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         exit (1);
@@ -104,19 +105,19 @@ void* AcceptConnectionsScout(void* _S) {
 
         int incoming_port = ntohs(return_port_no((struct sockaddr *)&their_addr));
 
-        int process_id = S->IsLeaderPort(incoming_port);
+        int process_id = SC->S->IsLeaderPort(incoming_port);
         if (process_id != -1) { //incoming connection from a leader
-            S->set_leader_fd(process_id, new_fd);
+            SC->set_leader_fd(process_id, new_fd);
         } else {
-            process_id = S->IsReplicaPort(incoming_port);
+            process_id = SC->S->IsReplicaPort(incoming_port);
             if (process_id != -1) { //incoming connection from a replica
-                S->set_replica_fd(process_id, new_fd);
+                SC->set_replica_fd(process_id, new_fd);
             } else {
-                process_id = S->IsAcceptorPort(incoming_port);
+                process_id = SC->S->IsAcceptorPort(incoming_port);
                 if (process_id != -1) { //incoming connection from an acceptor
-                    S->set_acceptor_fd(process_id, new_fd);
+                    SC->set_acceptor_fd(process_id, new_fd);
                 } else {
-                    D(cout << "SS" << S->get_pid() << ": ERROR: Unexpected connect request from port "
+                    D(cout << "SS" << SC->S->get_pid() << ": ERROR: Unexpected connect request from port "
                       << incoming_port << endl;)
                 }
             }

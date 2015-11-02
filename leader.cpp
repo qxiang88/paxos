@@ -1,3 +1,4 @@
+#include "leader.h"
 #include "server.h"
 #include "constants.h"
 #include "utilities.h"
@@ -22,32 +23,69 @@ typedef pair<int, Proposal> SPtuple;
 #  define D(x)
 #endif // DEBUG
 
-int Server::get_leader_fd(const int server_id) {
-    return leader_fd_[server_id];
+extern void* CommanderMode(void* _rcv_thread_arg);
+
+Leader::Leader(Server* _S) {
+    S = _S;
+
+    set_ballot_num(Ballot(S->get_pid(), 0));
+    set_leader_active(false);
+
+    int num_servers = S->get_num_servers();
+
+    commander_fd_.resize(num_servers, -1);
+    scout_fd_.resize(num_servers, -1);
+    replica_fd_.resize(num_servers, -1);
 }
 
-int Server::get_leader_port(const int server_id) {
-    return leader_port_[server_id];
+int Leader::get_commander_fd(const int server_id) {
+    return commander_fd_[server_id];
 }
 
-void Server::set_leader_fd(const int server_id, const int fd) {
-    // if (fd == -1 || leader_fd_[server_id] == -1) {
-        leader_fd_[server_id] = fd;
-    // }
+int Leader::get_scout_fd(const int server_id) {
+    return scout_fd_[server_id];
+}
+
+int Leader::get_replica_fd(const int server_id) {
+    return replica_fd_[server_id];
+}
+
+Ballot Leader::get_ballot_num() {
+    return ballot_num_;
+}
+
+bool Leader::get_leader_active() {
+    return leader_active_;
+}
+
+void Leader::set_commander_fd(const int server_id, const int fd) {
+    commander_fd_[server_id] = fd;
+}
+
+void Leader::set_scout_fd(const int server_id, const int fd) {
+    scout_fd_[server_id] = fd;
+}
+
+void Leader::set_replica_fd(const int server_id, const int fd) {
+    replica_fd_[server_id] = fd;
+}
+
+void Leader::set_ballot_num(const Ballot &ballot_num) {
+    ballot_num_.id = ballot_num.id;
+    ballot_num_.seq_num = ballot_num.seq_num;
+}
+
+void Leader::set_leader_active(const bool b) {
+    leader_active_ = b;
 }
 
 /**
- * checks if given port corresponds to a leader's port
- * @param  port port number to be checked
- * @return      id of server whose leader port matches param port
- * @return      -1 if param port is not the leader port of any server
+ * increments the value of ballot_num_
  */
-int Server::IsLeaderPort(const int port) {
-    if (leader_port_map_.find(port) != leader_port_map_.end()) {
-        return leader_port_map_[port];
-    } else {
-        return -1;
-    }
+void Leader::IncrementBallotNum() {
+    Ballot b = get_ballot_num();
+    b.seq_num++;
+    set_ballot_num(b);
 }
 
 /**
@@ -56,119 +94,126 @@ int Server::IsLeaderPort(const int port) {
  * @return    NULL
  */
 void *LeaderEntry(void *_S) {
-    Server *S = (Server*) _S;
+    Leader R((Server*)_S);
 
     // does not need accept threads since it does not listen to connections from anyone
 
     // sleep for some time to make sure accept threads of commanders,scouts,replica are running
     usleep(kGeneralSleep);
-    if (S->ConnectToCommanderL(S->get_primary_id())) {
-        D(cout << "SL" << S->get_pid() << ": Connected to commander of S"
-          << S->get_primary_id() << endl;)
+    int primary_id = R.S->get_primary_id();
+    if (R.ConnectToCommander(primary_id)) {
+        D(cout << "SL" << R.S->get_pid() << ": Connected to commander of S"
+          << primary_id << endl;)
     } else {
-        D(cout << "SL" << S->get_pid() << ": ERROR in connecting to commander of S"
-          << S->get_primary_id() << endl;)
+        D(cout << "SL" << R.S->get_pid() << ": ERROR in connecting to commander of S"
+          << primary_id << endl;)
         return NULL;
     }
 
-    if (S->ConnectToScoutL(S->get_primary_id())) {
-        D(cout << "SL" << S->get_pid() << ": Connected to scout of S"
-          << S->get_primary_id() << endl;)
+    if (R.ConnectToScout(primary_id)) {
+        D(cout << "SL" << R.S->get_pid() << ": Connected to scout of S"
+          << primary_id << endl;)
     } else {
-        D(cout << "SL" << S->get_pid() << ": ERROR in connecting to scout of S"
-          << S->get_primary_id() << endl;)
+        D(cout << "SL" << R.S->get_pid() << ": ERROR in connecting to scout of S"
+          << primary_id << endl;)
         return NULL;
     }
 
-    if (S->ConnectToReplica(S->get_primary_id())) { // same as S->get_pid()
-        D(cout << "SL" << S->get_pid() << ": Connected to replica of S"
-          << S->get_primary_id() << endl;)
+    if (R.ConnectToReplica(primary_id)) { // same as R.S->get_pid()
+        D(cout << "SL" << R.S->get_pid() << ": Connected to replica of S"
+          << primary_id << endl;)
     } else {
-        D(cout << "SL" << S->get_pid() << ": ERROR in connecting to replica of S"
-          << S->get_primary_id() << endl;)
+        D(cout << "SL" << R.S->get_pid() << ": ERROR in connecting to replica of S"
+          << primary_id << endl;)
         return NULL;
     }
 
-    S->Leader();
+    R.LeaderMode();
+    return NULL;
 }
 
-void Server::Leader()
+/**
+ * function for performing leader related job
+ */
+void Leader::LeaderMode()
 {
-    leader_active_ = false;
-    proposals_.clear();
-    ballot_num_.id = get_pid();
-    ballot_num_.seq_num = 0;
-
-    pthread_t scout_thread;
-    CreateThread(Scout, (void*)this, scout_thread);
+    // pthread_t scout_thread;
+    // CreateThread(ScoutMode, (void*)this, scout_thread);
 
     char buf[kMaxDataSize];
     int num_bytes;
-    int num_servers = get_num_servers();
+    int num_servers = S->get_num_servers();
     while (true) {  // always listen to messages from the acceptors
-        if ((num_bytes = recv(get_replica_fd(get_primary_id()), buf, kMaxDataSize - 1, 0)) == -1) 
+        if ((num_bytes = recv(get_replica_fd(S->get_primary_id()), buf, kMaxDataSize - 1, 0)) == -1)
         {
-          D(cout << "Leader ERROR in receiving" << endl;)
-          // pthread_exit(NULL); //TODO: think about whether it should be exit or not
+            D(cout << "SL" << S->get_pid() << ": ERROR in receving from primary replica" << endl;)
+            // pthread_exit(NULL); //TODO: think about whether it should be exit or not
         } else if (num_bytes == 0) {     //connection closed
-          D(cout << "Leader connection closed by self??"<< endl;)
+            D(cout << "SL" << S->get_pid() << ": ERROR Connection closed by primary replica" << endl;)
         } else {
             buf[num_bytes] = '\0';
             std::vector<string> message = split(string(buf), kMessageDelim[0]);
-            for (const auto &msg : message) 
+            for (const auto &msg : message)
             {
                 std::vector<string> token = split(string(msg), kInternalDelim[0]);
-                if (token[0] == kPropose) 
+                if (token[0] == kPropose)
                 {
-                    D(cout << "Leader receives PROPOSE" << "message"<<  endl;)
-                    if(proposals_.find(stoi(token[1]))==proposals_.end())
+                    D(cout << "Leader receives PROPOSE" << "message" <<  endl;)
+                    if (S->proposals_.find(stoi(token[1])) == S->proposals_.end())
                     {
-                      proposals_[stoi(token[1])]=stringToProposal(token[2]);
-                      if(leader_active_)
-                      {
-                        pthread_t commander_thread;
-                        CommanderThreadArgument* arg = new CommanderThreadArgument;
-                        arg->S = this;
-                        Triple tempt = Triple(ballot_num_, stoi(token[1]), proposals_[stoi(token[1])]);
-                        arg->toSend = &tempt;
-                        CreateThread(Commander, (void*)arg, commander_thread);
-                      }
+                        S->proposals_[stoi(token[1])] = stringToProposal(token[2]);
+                        if (get_leader_active())
+                        {
+                            // scout
+                            pthread_t scout_thread;
+                            ScoutThreadArgument* arg = new ScoutThreadArgument;
+                            arg->SC = S->get_scout_object();
+                            arg->ball = get_ballot_num();;
+                            CreateThread(ScoutMode, (void*)arg, scout_thread);
+                        }
                     }
-                } 
-                else if(token[0] == kAdopted)
+                }
+                else if (token[0] == kAdopted)
                 {
-                  unordered_set<Triple> pvalues = stringToTripleSet(token[2]);
-                  proposals_ = pairxor(proposals_, pmax(pvalues));
+                    unordered_set<Triple> pvalues = stringToTripleSet(token[2]);
+                    S->proposals_ = pairxor(S->proposals_, pmax(pvalues));
 
-                  pthread_t commander_thread[proposals_.size()];
-                  int i=0;
-                  for(auto it = proposals_.begin(); it!=proposals_.end(); it++)
-                  {
-                    CommanderThreadArgument* arg = new CommanderThreadArgument;
-                    arg->S = this;
-                    Triple tempt = Triple(ballot_num_, stoi(token[1]), proposals_[stoi(token[1])]);
-                    arg->toSend = &tempt;
-                    CreateThread(Commander, (void*)arg, commander_thread[i]);
-                    i++;
-                  }
-                  leader_active_ = true;
+                    pthread_t commander_thread[S->proposals_.size()];
+                    int i = 0;
+                    for (auto it = S->proposals_.begin(); it != S->proposals_.end(); it++)
+                    {
+                        // commander
+                        Commander C(S);
+                        CommanderThreadArgument* arg = new CommanderThreadArgument;
+                        arg->C = &C;
+                        Triple tempt = Triple(get_ballot_num(), stoi(token[1]), S->proposals_[stoi(token[1])]);
+                        arg->toSend = &tempt;
+                        CreateThread(CommanderMode, (void*)arg, commander_thread[i]);
+                        i++;
+                    }
+                    set_leader_active(true);
                 }
 
-                else if(token[0]==kPreEmpted)
+                else if (token[0] == kPreEmpted)
                 {
-                  Ballot recvd_b = stringToBallot(token[1]);
-                  if(recvd_b>ballot_num_)
-                  {
-                    leader_active_ = false;
-                    IncrementBallotNum();
-                  }
-                }
+                    Ballot recvd_b = stringToBallot(token[1]);
+                    if (recvd_b > get_ballot_num())
+                    {
+                        set_leader_active(false);
+                        IncrementBallotNum();
 
+                        // scout
+                        pthread_t scout_thread;
+                        ScoutThreadArgument* arg = new ScoutThreadArgument;
+                        arg->SC = S->get_scout_object();
+                        arg->ball = get_ballot_num();
+                        CreateThread(ScoutMode, (void*)arg, scout_thread);
+                    }
+                }
                 else {    //other messages
-                    D(cout<<"Unexpected message in Leader "<<msg<<endl;)
+                    D(cout << "SL" << S->get_pid() << "ERROR: Unexpected message received: " << msg << endl;)
                 }
             }
         }
-      }
-    
+    }
 }

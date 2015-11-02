@@ -1,3 +1,4 @@
+#include "scout.h"
 #include "server.h"
 #include "constants.h"
 #include "utilities.h"
@@ -25,101 +26,151 @@ typedef pair<int, Proposal> SPtuple;
 
 extern void* AcceptConnectionsScout(void* _S);
 
-int Server::get_scout_fd(const int server_id) {
-    return scout_fd_[server_id];
+Scout::Scout(Server* _S) {
+    S = _S;
+
+    int num_servers = S->get_num_servers();
+
+    leader_fd_.resize(num_servers, -1);
+    replica_fd_.resize(num_servers, -1);
+    acceptor_fd_.resize(num_servers, -1);
 }
 
-int Server::get_scout_listen_port(const int server_id) {
-    return scout_listen_port_[server_id];
+int Scout::get_leader_fd(const int server_id) {
+    return leader_fd_[server_id];
 }
 
-void Server::set_scout_fd(const int server_id, const int fd) {
-    // if (fd == -1 || scout_fd_[server_id] == -1) {
-        scout_fd_[server_id] = fd;
-    // }
+int Scout::get_replica_fd(const int server_id) {
+    return replica_fd_[server_id];
 }
 
-/**
- * creates accept thread for scout
- */
-void Server::ScoutAcceptThread() {
-    pthread_t accept_connections_thread;
-    CreateThread(AcceptConnectionsScout, (void*)this, accept_connections_thread);
+int Scout::get_acceptor_fd(const int server_id) {
+    return acceptor_fd_[server_id];
 }
 
-void Server::SendP1a(const Ballot& b)
+void Scout::set_leader_fd(const int server_id, const int fd) {
+    leader_fd_[server_id] = fd;
+}
+
+void Scout::set_replica_fd(const int server_id, const int fd) {
+    replica_fd_[server_id] = fd;
+}
+
+void Scout::set_acceptor_fd(const int server_id, const int fd) {
+    acceptor_fd_[server_id] = fd;
+}
+
+void Scout::SendToServers(const string& type, const string& msg)
 {
-    string msg = kP1a + kInternalDelim + to_string(get_pid());
+    int serv_fd;
+    for (int i = 0; i < S->get_num_servers(); i++)
+    {
+        if (type == kDecision)
+            serv_fd = get_replica_fd(i);
+        else if (type == kP1a) //p2a sent in commander
+            serv_fd = get_acceptor_fd(i);
+
+        if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
+            D(cout << "SS" << S->get_pid() << ": ERROR: sending to replica or acceptor S" << (i) << endl;)
+        }
+        else {
+            D(cout << "SS" << S->get_pid() << ": Message sent to S" << i << ": " << msg << endl;)
+        }
+    }
+}
+
+void Scout::GetAcceptorFdSet(fd_set& acceptor_set, int& fd_max)
+{
+    fd_max = INT_MIN;
+    int fd_temp;
+    FD_ZERO(&acceptor_set);
+    for (int i = 0; i < S->get_num_servers(); i++) {
+        fd_temp = get_acceptor_fd(i);
+        if (fd_temp != -1)
+        {
+            FD_SET(fd_temp, &acceptor_set);
+            fd_max = max(fd_max, fd_temp);
+        }
+    }
+}
+
+void Scout::SendP1a(const Ballot &b)
+{
+    string msg = kP1a + kInternalDelim + to_string(S->get_pid());
     msg += kInternalDelim + ballotToString(b) + kMessageDelim;
     SendToServers(kP1a, msg);
 }
 
-void Server::SendAdopted(const Ballot& recvd_ballot, unordered_set<Triple> pvalues) {
+void Scout::SendAdopted(const Ballot& recvd_ballot, unordered_set<Triple> pvalues) {
     string msg = kAdopted + kInternalDelim + ballotToString(recvd_ballot) + kInternalDelim;
     msg += tripleSetToString(pvalues) + kMessageDelim;
-    Unicast(kAdopted, msg);
+    S->Unicast(kAdopted, msg);
 }
 
+void Scout::SendPreEmpted(const Ballot& b)
+{
+    string msg = kPreEmpted + kInternalDelim + ballotToString(b) + kMessageDelim;
+    S->Unicast(kPreEmpted, msg);
+}
 
-void* Scout(void* _rcv_thread_arg) {
+void* ScoutMode(void* _rcv_thread_arg) {
     ScoutThreadArgument *rcv_thread_arg = (ScoutThreadArgument *)_rcv_thread_arg;
-    Server *S = rcv_thread_arg->S;
-    Ballot * ball = rcv_thread_arg->ball;
+    Scout *SC = rcv_thread_arg->SC;
+    Ballot ball = rcv_thread_arg->ball;
 
-    S->SendP1a(*ball);
+    SC->SendP1a(ball);
 
     int num_bytes;
     unordered_set<Triple> pvalues;
     // fd_set temp_set;
 
-    int num_servers = S->get_num_servers();
+    int num_servers = SC->S->get_num_servers();
     int waitfor = num_servers;
     while (true) {  // always listen to messages from the acceptors
         fd_set acceptor_set;
         int fd_max;
-        S->GetAcceptorFdSet(acceptor_set, fd_max);
-        
+        SC->GetAcceptorFdSet(acceptor_set, fd_max);
+
         int rv = select(fd_max + 1, &acceptor_set, NULL, NULL, NULL);
 
         if (rv == -1) { //error in select
-            D(cout << "ERROR in select() for Scout" << endl;)
+            D(cout << "SS" << SC->S->get_pid() << ": ERROR in select()" << endl;)
         } else if (rv == 0) {
-            continue;
+            D(cout << "SS" << SC->S->get_pid() << ": ERROR Unexpected select timeout" << endl;)
         } else {
             for (int i = 0; i < num_servers; i++) {
-                if (FD_ISSET(S->get_acceptor_fd(i), &acceptor_set)) { // we got one!!
+                if (FD_ISSET(SC->get_acceptor_fd(i), &acceptor_set)) { // we got one!!
                     char buf[kMaxDataSize];
-                    if ((num_bytes = recv(S->get_acceptor_fd(i), buf, kMaxDataSize - 1, 0)) == -1) {
-                        D(cout << "ERROR in receiving p1b from " << i << endl;)
+                    if ((num_bytes = recv(SC->get_acceptor_fd(i), buf, kMaxDataSize - 1, 0)) == -1) {
+                        D(cout << "SS" << SC->S->get_pid() << ": ERROR in receiving p1b from acceptor S" << i << endl;)
                         // pthread_exit(NULL); //TODO: think about whether it should be exit or not
                     } else if (num_bytes == 0) {     //connection closed
-                        D(cout << "Scout connection closed by " << i << endl;)
+                        D(cout << "SS" << SC->S->get_pid() << ": ERROR Connection closed connection closed by acceptor S" << i << endl;)
                     } else {
                         buf[num_bytes] = '\0';
                         std::vector<string> message = split(string(buf), kMessageDelim[0]);
                         for (const auto &msg : message) {
                             std::vector<string> token = split(string(msg), kInternalDelim[0]);
                             if (token[0] == kP1b) {
-                                D(cout << "P1b" << "message received from " << i <<  endl;)
+                                D(cout << "SS" << SC->S->get_pid() << ": received P1B from acceptor S" << i <<  endl;)
 
                                 Ballot recvd_ballot = stringToBallot(token[2]);
                                 unordered_set<Triple> r = stringToTripleSet(token[3]);
-                                if (recvd_ballot == *ball)
+                                if (recvd_ballot == ball)
                                 {
                                     union_set(pvalues, r);
                                     waitfor--;
                                     if (waitfor < (num_servers / 2))
                                     {
-                                        S->SendAdopted(recvd_ballot, pvalues);
+                                        SC->SendAdopted(recvd_ballot, pvalues);
                                         return NULL;
                                     }
                                 } else {
-                                    S->SendPreEmpted(recvd_ballot);
+                                    SC->SendPreEmpted(recvd_ballot);
                                     return NULL;
                                 }
-
                             } else {    //other messages
-                                D(cout << "Unexpected message in Scout " << msg << endl;)
+                                D(cout << "SS" << SC->S->get_pid() << ": ERROR Unexpected message received: " << msg << endl;)
                             }
                         }
                     }

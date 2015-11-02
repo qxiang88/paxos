@@ -24,6 +24,13 @@ typedef pair<int, Proposal> SPtuple;
 #endif // DEBUG
 
 extern void* AcceptConnectionsServer(void* _S);
+extern void* AcceptConnectionsCommander(void* _C);
+extern void* AcceptConnectionsScout(void* _SC);
+
+// commander class static member initialization
+// Commander::leader_fd_ = std::vector<int> (num_servers_, -1);
+// Commander::replica_fd_ = std::vector<int> (num_servers_, -1);
+
 void *ReplicaEntry(void *_S);
 void *AcceptorEntry(void *_S);
 void *LeaderEntry(void *_S);
@@ -32,12 +39,20 @@ int Server::get_pid() {
     return pid_;
 }
 
-int Server::get_client_chat_fd(const int client_id) {
-    return client_chat_fd_[client_id];
-}
-
 int Server::get_master_port() {
     return master_port_;
+}
+
+int Server::get_replica_port(const int server_id) {
+    return replica_port_[server_id];
+}
+
+int Server::get_acceptor_port(const int server_id) {
+    return acceptor_port_[server_id];
+}
+
+int Server::get_leader_port(const int server_id) {
+    return leader_port_[server_id];
 }
 
 int Server::get_server_listen_port(const int server_id) {
@@ -52,12 +67,20 @@ int Server::get_acceptor_listen_port(const int server_id) {
     return acceptor_listen_port_[server_id];
 }
 
-int Server::get_primary_id() {
-    return primary_id_;
+int Server::get_replica_listen_port(const int server_id) {
+    return replica_listen_port_[server_id];
 }
 
-int Server::get_slot_num() {
-    return slot_num_;
+int Server::get_commander_listen_port(const int server_id) {
+    return commander_listen_port_[server_id];
+}
+
+int Server::get_scout_listen_port(const int server_id) {
+    return scout_listen_port_[server_id];
+}
+
+int Server::get_primary_id() {
+    return primary_id_;
 }
 
 int Server::get_num_servers() {
@@ -68,14 +91,8 @@ int Server::get_num_clients() {
     return num_clients_;
 }
 
-Ballot Server::get_ballot_num() {
-    return ballot_num_;
-}
-
-void Server::set_client_chat_fd(const int client_id, const int fd) {
-    // if (fd == -1 || client_chat_fd_[client_id] == -1) {
-        client_chat_fd_[client_id] = fd;
-    // }
+Scout* Server:: get_scout_object() {
+    return scout_object_;
 }
 
 void Server::set_pid(const int pid) {
@@ -90,29 +107,8 @@ void Server::set_primary_id(const int primary_id) {
     primary_id_ = primary_id;
 }
 
-void Server::set_slot_num(const int slot_num) {
-    slot_num_ = slot_num;
-}
-
-void Server::set_ballot_num(const Ballot &ballot_num) {
-    ballot_num_.id = ballot_num.id;
-    ballot_num_.seq_num = ballot_num.seq_num;
-}
-
-/**
- * increments the value of slot_num_
- */
-void Server::IncrementSlotNum() {
-    set_slot_num(get_slot_num() + 1);
-}
-
-/**
- * increments the value of ballot_num_
- */
-void Server::IncrementBallotNum() {
-    Ballot b = get_ballot_num();
-    b.seq_num++;
-    set_ballot_num(b);
+void Server::set_scout_object(Scout* sc) {
+    scout_object_ = sc;
 }
 
 /**
@@ -124,6 +120,48 @@ void Server::IncrementBallotNum() {
 int Server::IsClientChatPort(const int port) {
     if (client_chat_port_map_.find(port) != client_chat_port_map_.end()) {
         return client_chat_port_map_[port];
+    } else {
+        return -1;
+    }
+}
+
+/**
+ * checks if given port corresponds to a replica's port
+ * @param  port port number to be checked
+ * @return      id of server whose replica port matches param port
+ * @return      -1 if param port is not the replica port of any server
+ */
+int Server::IsReplicaPort(const int port) {
+    if (replica_port_map_.find(port) != replica_port_map_.end()) {
+        return replica_port_map_[port];
+    } else {
+        return -1;
+    }
+}
+
+/**
+ * checks if given port corresponds to a leader's port
+ * @param  port port number to be checked
+ * @return      id of server whose leader port matches param port
+ * @return      -1 if param port is not the leader port of any server
+ */
+int Server::IsLeaderPort(const int port) {
+    if (leader_port_map_.find(port) != leader_port_map_.end()) {
+        return leader_port_map_[port];
+    } else {
+        return -1;
+    }
+}
+
+/**
+ * checks if given port corresponds to an acceptor's port
+ * @param  port port number to be checked
+ * @return      id of server whose acceptor port matches param port
+ * @return      -1 if param port is not the acceptor port of any server
+ */
+int Server::IsAcceptorPort(const int port) {
+    if (acceptor_port_map_.find(port) != acceptor_port_map_.end()) {
+        return acceptor_port_map_[port];
     } else {
         return -1;
     }
@@ -197,17 +235,8 @@ void Server::Initialize(const int pid,
                         const int num_clients) {
     set_pid(pid);
     set_primary_id(0);
-    set_slot_num(0);
-    set_ballot_num(Ballot(pid, 0));
     num_servers_ = num_servers;
     num_clients_ = num_clients;
-
-    commander_fd_.resize(num_servers_, -1);
-    scout_fd_.resize(num_servers_, -1);
-    replica_fd_.resize(num_servers_, -1);
-    acceptor_fd_.resize(num_servers_, -1);
-    leader_fd_.resize(num_servers_, -1);
-    client_chat_fd_.resize(num_clients_, -1);
 
     server_listen_port_.resize(num_servers_);
     client_listen_port_.resize(num_clients_);
@@ -220,93 +249,51 @@ void Server::Initialize(const int pid,
     acceptor_port_.resize(num_servers_);
     replica_port_.resize(num_servers_);
     leader_port_.resize(num_servers_);
+
+    set_scout_object(NULL);
 }
 
-
-void Server::GetAcceptorFdSet(fd_set& acceptor_set, int& fd_max)
-{
-    fd_max = INT_MIN;
-    int fd_temp;
-    FD_ZERO(&acceptor_set);
-    for (int i = 0; i < get_num_servers(); i++) {
-        fd_temp = get_acceptor_fd(i);
-        if(fd_temp!=-1)
-        {
-            FD_SET(fd_temp, &acceptor_set);
-            fd_max = max(fd_max, fd_temp);
-        }
-    }
+/**
+ * creates accept thread for commander
+ */
+void Server::CommanderAcceptThread(Commander* C) {
+    pthread_t accept_connections_thread;
+    CreateThread(AcceptConnectionsCommander, (void*)C, accept_connections_thread);
 }
 
-void Server::GetCommanderFdSet(fd_set& cfds_set, vector<int>& cfds_vec, int& fd_max)
-{
-    int fd_temp;
-    fd_max = INT_MIN;
-    set<int> local_set = get_commander_fd_set();
-    FD_ZERO(&cfds_set);
-    cfds_vec.clear();
-     for(auto it=local_set.begin(); it!=local_set.end(); it++)
-    {
-        fd_temp = *it; 
-        if(fd_temp!=-1)
-        {
-            FD_SET(fd_temp, &cfds_set);
-            fd_max = max(fd_max, fd_temp);
-            cfds_vec.push_back(fd_temp);
-        }
-    }
-}
-
-void Server::SendToServers(const string& type, const string& msg)
-{
-    int serv_fd;
-    for (int i = 0; i < num_servers_; i++)
-    {
-        if (type == kDecision)
-            serv_fd = get_replica_fd(i);
-        else if (type == kP1a) //p2a sent in commander
-            serv_fd = get_acceptor_fd(i);
-
-        if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
-            D(cout << ": ERROR: sending to " << (i) << endl;)
-        }
-        else {
-            D(cout << ": Msg sent to " << (i) << endl;)
-        }
-    }
+/**
+ * creates accept thread for scout
+ */
+void Server::ScoutAcceptThread(Scout* SC) {
+    pthread_t accept_connections_thread;
+    CreateThread(AcceptConnectionsScout, (void*)SC, accept_connections_thread);
 }
 
 void Server::Unicast(const string &type, const string& msg, int r_fd)
-{   
-    int serv_fd;
-    if(r_fd==-1)
-    {
-        if(type==kPreEmpted || type==kAdopted || type==kPropose)
-            serv_fd = get_leader_fd(get_pid());
-        else if(type==kP2b)
-            serv_fd = get_commander_fd(get_pid());
-        else if(type==kP1b)
-            serv_fd = get_scout_fd(get_pid());            
-    }
-    else
-    {
-        //as of now only used for commander to acceptor messages    
-        D(cout<<"using non default port for unicast"<<endl;)
-        serv_fd = r_fd;
-    }
-
-    if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
-        D(cout << ": ERROR: sending "<<type<< endl;)
-    }
-    else {
-        D(cout << ": "<< type<< "Msg sent"<<endl;)
-    }
-}
-
-void Server::SendPreEmpted(const Ballot& b)
 {
-    string msg = kPreEmpted + kInternalDelim + ballotToString(b) + kMessageDelim;
-    Unicast(kPreEmpted, msg);
+    // int serv_fd;
+    // if (r_fd == -1)
+    // {
+    //     if (type == kPreEmpted || type == kAdopted || type == kPropose)
+    //         serv_fd = get_leader_fd(get_pid());
+    //     else if (type == kP2b)
+    //         serv_fd = get_commander_fd(get_pid());
+    //     else if (type == kP1b)
+    //         serv_fd = get_scout_fd(get_pid());
+    // }
+    // else
+    // {
+    //     //as of now only used for commander to acceptor messages
+    //     D(cout << "using non default port for unicast" << endl;)
+    //     serv_fd = r_fd;
+    // }
+
+    // if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
+    //     D(cout << ": ERROR: sending " << type << endl;)
+    // }
+    // else {
+    //     D(cout << ": " << type << "Msg sent" << endl;)
+    // }
 }
 
 int main(int argc, char *argv[]) {
@@ -320,8 +307,12 @@ int main(int argc, char *argv[]) {
     CreateThread(AcceptConnectionsServer, (void*)&S, accept_connections_thread);
 
     if (S.get_pid() == S.get_primary_id()) {
-        S.CommanderAcceptThread();
-        S.ScoutAcceptThread();
+        Commander C(&S, S.get_num_servers());
+        S.CommanderAcceptThread(&C);
+        
+        Scout SC(&S);
+        S.set_scout_object(&SC);
+        S.ScoutAcceptThread(S.get_scout_object());
     }
 
     pthread_t replica_thread;

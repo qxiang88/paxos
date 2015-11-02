@@ -1,4 +1,5 @@
 #include "server.h"
+#include "replica.h"
 #include "constants.h"
 #include "iostream"
 #include "unistd.h"
@@ -28,8 +29,8 @@ extern void sigchld_handler(int s);
  * function for replica's accept connections thread
  * @param _S Pointer to server class object
  */
-void* AcceptConnectionsReplica(void* _S) {
-    Server *S = (Server *)_S;
+void* AcceptConnectionsReplica(void* _R) {
+    Replica *R = (Replica*)_R;
 
     int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
     struct addrinfo hints, *servinfo, *l;
@@ -44,7 +45,7 @@ void* AcceptConnectionsReplica(void* _S) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(S->get_replica_listen_port(S->get_pid())).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(R->S->get_replica_listen_port(R->S->get_pid())).c_str(),
                           &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         exit (1);
@@ -104,15 +105,15 @@ void* AcceptConnectionsReplica(void* _S) {
 
         int incoming_port = ntohs(return_port_no((struct sockaddr *)&their_addr));
 
-        int process_id = S->IsLeaderPort(incoming_port);
+        int process_id = R->S->IsLeaderPort(incoming_port);
         if (process_id != -1) { //incoming connection from a leader
-            S->set_leader_fd(process_id, new_fd);
+            R->set_leader_fd(process_id, new_fd);
         } else {
-            process_id = S->IsClientChatPort(incoming_port);
+            process_id = R->S->IsClientChatPort(incoming_port);
             if (process_id != -1) { //incoming connection from chat port of a client
-                S->set_client_chat_fd(process_id, new_fd);
+                R->set_client_chat_fd(process_id, new_fd);
             } else {
-                D(cout << "SR" << S->get_pid() << ": ERROR: Unexpected connect request from port "
+                D(cout << "SR" << R->S->get_pid() << ": ERROR: Unexpected connect request from port "
                      << incoming_port << endl;)
             }
         }
@@ -125,8 +126,8 @@ void* AcceptConnectionsReplica(void* _S) {
  * @param server_id id of server whose commander to connect to
  * @return  true if connection was successfull or already connected
  */
-bool Server::ConnectToCommanderR(const int server_id) {
-    if (get_commander_fd(server_id) != -1) return true;
+bool Replica::ConnectToCommander(const int server_id) {
+    // if (get_commander_fd(server_id) != -1) return true;
 
     int sockfd;  // listen on sock_fd, new connection on new_fd
     struct addrinfo hints, *clientinfo, *l;
@@ -139,7 +140,7 @@ bool Server::ConnectToCommanderR(const int server_id) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(get_replica_port(get_pid())).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(S->get_replica_port(S->get_pid())).c_str(),
                           &hints, &clientinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         exit (1);
@@ -192,7 +193,7 @@ bool Server::ConnectToCommanderR(const int server_id) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(get_commander_listen_port(server_id)).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(S->get_commander_listen_port(server_id)).c_str(),
                           &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return false;
@@ -223,8 +224,8 @@ bool Server::ConnectToCommanderR(const int server_id) {
  * @param server_id id of server whose scout to connect to
  * @return  true if connection was successfull or already connected
  */
-bool Server::ConnectToScoutR(const int server_id) {
-    if (get_scout_fd(server_id) != -1) return true;
+bool Replica::ConnectToScout(const int server_id) {
+    // if (get_scout_fd(server_id) != -1) return true;
 
     int sockfd;  // listen on sock_fd, new connection on new_fd
     struct addrinfo hints, *clientinfo, *l;
@@ -237,7 +238,7 @@ bool Server::ConnectToScoutR(const int server_id) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(get_replica_port(get_pid())).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(S->get_replica_port(S->get_pid())).c_str(),
                           &hints, &clientinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         exit (1);
@@ -290,7 +291,7 @@ bool Server::ConnectToScoutR(const int server_id) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(get_scout_listen_port(server_id)).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(S->get_scout_listen_port(server_id)).c_str(),
                           &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return false;

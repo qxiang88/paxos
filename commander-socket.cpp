@@ -1,3 +1,4 @@
+#include "commander.h"
 #include "server.h"
 #include "constants.h"
 #include "iostream"
@@ -28,8 +29,8 @@ extern void sigchld_handler(int s);
  * function for commander's accept connections thread
  * @param _S Pointer to server class object
  */
-void* AcceptConnectionsCommander(void* _S) {
-    Server *S = (Server *)_S;
+void* AcceptConnectionsCommander(void* _C) {
+    Commander *C = (Commander*)_C;
 
     int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
     struct addrinfo hints, *servinfo, *l;
@@ -44,7 +45,7 @@ void* AcceptConnectionsCommander(void* _S) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(S->get_commander_listen_port(S->get_pid())).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(C->S->get_commander_listen_port(C->S->get_pid())).c_str(),
                           &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         exit (1);
@@ -104,19 +105,15 @@ void* AcceptConnectionsCommander(void* _S) {
 
         int incoming_port = ntohs(return_port_no((struct sockaddr *)&their_addr));
 
-        int process_id = S->IsLeaderPort(incoming_port);
+        int process_id = C->S->IsLeaderPort(incoming_port);
         if (process_id != -1) { //incoming connection from a leader
-            S->set_leader_fd(process_id, new_fd);
+            C->set_leader_fd(process_id, new_fd);
         } else {
-            process_id = S->IsReplicaPort(incoming_port);
+            process_id = C->S->IsReplicaPort(incoming_port);
             if (process_id != -1) { //incoming connection from a replica
-                S->set_replica_fd(process_id, new_fd);
+                C->set_replica_fd(process_id, new_fd);
             } else {
-                // process_id = S->IsAcceptorPort(incoming_port);
-                // if (process_id != -1) { //incoming connection from an acceptor
-                //     S->set_acceptor_fd(process_id, new_fd);
-                // } else {
-                D(cout << "SC" << S->get_pid() << ": ERROR: Unexpected connect request from port "
+                D(cout << "SC" << C->S->get_pid() << ": ERROR: Unexpected connect request from port "
                   << incoming_port << endl;)
             }
         }
@@ -129,9 +126,7 @@ void* AcceptConnectionsCommander(void* _S) {
  * @param server_id id of server whose acceptor to connect to
  * @return  true if connection was successfull or already connected
  */
-bool Server::ConnectToAcceptor(const int server_id) {
-    if (get_acceptor_fd(server_id) != -1) return true;
-
+bool Commander::ConnectToAcceptor(const int server_id) {
     int sockfd;
     int numbytes;
     struct addrinfo hints, *servinfo, *l;
@@ -144,7 +139,7 @@ bool Server::ConnectToAcceptor(const int server_id) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(get_acceptor_listen_port(server_id)).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(S->get_acceptor_listen_port(server_id)).c_str(),
                           &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return false;

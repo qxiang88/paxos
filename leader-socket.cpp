@@ -1,3 +1,4 @@
+#include "leader.h"
 #include "server.h"
 #include "constants.h"
 #include "iostream"
@@ -29,8 +30,8 @@ extern void sigchld_handler(int s);
  * @param server_id id of server whose commander to connect to
  * @return  true if connection was successfull or already connected
  */
-bool Server::ConnectToCommanderL(const int server_id) {
-    if (get_commander_fd(server_id) != -1) return true;
+bool Leader::ConnectToCommander(const int server_id) {
+    // if (get_commander_fd(server_id) != -1) return true;
 
     int sockfd;  // listen on sock_fd, new connection on new_fd
     struct addrinfo hints, *clientinfo, *l;
@@ -43,7 +44,7 @@ bool Server::ConnectToCommanderL(const int server_id) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(get_leader_port(get_pid())).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(S->get_leader_port(S->get_pid())).c_str(),
                           &hints, &clientinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         exit (1);
@@ -96,7 +97,7 @@ bool Server::ConnectToCommanderL(const int server_id) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(get_commander_listen_port(server_id)).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(S->get_commander_listen_port(server_id)).c_str(),
                           &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return false;
@@ -127,8 +128,8 @@ bool Server::ConnectToCommanderL(const int server_id) {
  * @param server_id id of server whose scout to connect to
  * @return  true if connection was successfull or already connected
  */
-bool Server::ConnectToScoutL(const int server_id) {
-    if (get_scout_fd(server_id) != -1) return true;
+bool Leader::ConnectToScout(const int server_id) {
+    // if (get_scout_fd(server_id) != -1) return true;
 
     int sockfd;  // listen on sock_fd, new connection on new_fd
     struct addrinfo hints, *clientinfo, *l;
@@ -141,7 +142,7 @@ bool Server::ConnectToScoutL(const int server_id) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(get_leader_port(get_pid())).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(S->get_leader_port(S->get_pid())).c_str(),
                           &hints, &clientinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         exit (1);
@@ -194,7 +195,7 @@ bool Server::ConnectToScoutL(const int server_id) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(get_scout_listen_port(server_id)).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(S->get_scout_listen_port(server_id)).c_str(),
                           &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return false;
@@ -225,8 +226,8 @@ bool Server::ConnectToScoutL(const int server_id) {
  * @param server_id id of server whose replica to connect to
  * @return  true if connection was successfull or already connected
  */
-bool Server::ConnectToReplica(const int server_id) {
-    if (get_replica_fd(server_id) != -1) return true;
+bool Leader::ConnectToReplica(const int server_id) {
+    // if (get_replica_fd(server_id) != -1) return true;
 
     int sockfd;  // listen on sock_fd, new connection on new_fd
     struct addrinfo hints, *clientinfo, *l;
@@ -239,7 +240,7 @@ bool Server::ConnectToReplica(const int server_id) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(get_leader_port(get_pid())).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(S->get_leader_port(S->get_pid())).c_str(),
                           &hints, &clientinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         exit (1);
@@ -292,7 +293,7 @@ bool Server::ConnectToReplica(const int server_id) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(get_replica_listen_port(server_id)).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(S->get_replica_listen_port(server_id)).c_str(),
                           &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return false;

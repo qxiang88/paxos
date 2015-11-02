@@ -1,3 +1,4 @@
+#include "acceptor.h"
 #include "server.h"
 #include "constants.h"
 #include "iostream"
@@ -28,8 +29,8 @@ extern void sigchld_handler(int s);
  * function for acceptor's accept connections thread
  * @param _S Pointer to server class object
  */
-void* AcceptConnectionsAcceptor(void* _S) {
-    Server *S = (Server *)_S;
+void* AcceptConnectionsAcceptor(void* _A) {
+    Acceptor *A = (Acceptor*)_A;
 
     int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
     struct addrinfo hints, *servinfo, *l;
@@ -44,7 +45,7 @@ void* AcceptConnectionsAcceptor(void* _S) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(S->get_acceptor_listen_port(S->get_pid())).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(A->S->get_acceptor_listen_port(A->S->get_pid())).c_str(),
                           &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         exit (1);
@@ -104,8 +105,8 @@ void* AcceptConnectionsAcceptor(void* _S) {
 
         int incoming_port = ntohs(return_port_no((struct sockaddr *)&their_addr));
         // incoming connection must be from a commander.
-        S->AddToCommanderFDSet(new_fd);
-        S->SendBackOwnFD(new_fd);
+        A->AddToCommanderFDSet(new_fd);
+        A->SendBackOwnFD(new_fd);
     }
     pthread_exit(NULL);
 }
@@ -115,8 +116,8 @@ void* AcceptConnectionsAcceptor(void* _S) {
  * @param server_id id of server whose scout to connect to
  * @return  true if connection was successfull or already connected
  */
-bool Server::ConnectToScoutA(const int server_id) {
-    if (get_scout_fd(server_id) != -1) return true;
+bool Acceptor::ConnectToScout(const int server_id) {
+    // if (get_scout_fd(server_id) != -1) return true;
 
     int sockfd;  // listen on sock_fd, new connection on new_fd
     struct addrinfo hints, *clientinfo, *l;
@@ -129,7 +130,7 @@ bool Server::ConnectToScoutA(const int server_id) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(get_acceptor_port(get_pid())).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(S->get_acceptor_port(S->get_pid())).c_str(),
                           &hints, &clientinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         exit (1);
@@ -182,7 +183,7 @@ bool Server::ConnectToScoutA(const int server_id) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
-    if ((rv = getaddrinfo(NULL, std::to_string(get_scout_listen_port(server_id)).c_str(),
+    if ((rv = getaddrinfo(NULL, std::to_string(S->get_scout_listen_port(server_id)).c_str(),
                           &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return false;
