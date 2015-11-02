@@ -48,6 +48,10 @@ int Server::get_client_listen_port(const int client_id) {
     return client_listen_port_[client_id];
 }
 
+int Server::get_acceptor_listen_port(const int server_id) {
+    return acceptor_listen_port_[server_id];
+}
+
 int Server::get_primary_id() {
     return primary_id_;
 }
@@ -60,14 +64,18 @@ int Server::get_num_servers() {
     return num_servers_;
 }
 
+int Server::get_num_clients() {
+    return num_clients_;
+}
+
 Ballot Server::get_ballot_num() {
     return ballot_num_;
 }
 
 void Server::set_client_chat_fd(const int client_id, const int fd) {
-    if (fd == -1 || client_chat_fd_[client_id] == -1) {
+    // if (fd == -1 || client_chat_fd_[client_id] == -1) {
         client_chat_fd_[client_id] = fd;
-    }
+    // }
 }
 
 void Server::set_pid(const int pid) {
@@ -154,6 +162,9 @@ bool Server::ReadPortsFile() {
             replica_listen_port_[i] = port;
 
             fin >> port;
+            acceptor_listen_port_[i] = port;
+
+            fin >> port;
             acceptor_port_[i] = port;
             acceptor_port_map_.insert(make_pair(port, i));
 
@@ -212,27 +223,38 @@ void Server::Initialize(const int pid,
 }
 
 
-fd_set Server::GetAcceptorFdSet()
+void Server::GetAcceptorFdSet(fd_set& acceptor_set, int& fd_max)
 {
-    fd_set acceptor_set;
-    int fd_max = INT_MIN, fd_temp;
+    fd_max = INT_MIN;
+    int fd_temp;
     FD_ZERO(&acceptor_set);
     for (int i = 0; i < get_num_servers(); i++) {
         fd_temp = get_acceptor_fd(i);
-        FD_SET(fd_temp, &acceptor_set);
-        fd_max = max(fd_max, fd_temp);
+        if(fd_temp!=-1)
+        {
+            FD_SET(fd_temp, &acceptor_set);
+            fd_max = max(fd_max, fd_temp);
+        }
     }
-    return acceptor_set;
 }
 
-int Server::GetMaxAcceptorFd()
+void Server::GetCommanderFdSet(fd_set& cfds_set, vector<int>& cfds_vec, int& fd_max)
 {
-    int fd_max = INT_MIN, fd_temp;
-    for (int i = 0; i < get_num_servers(); i++) {
-        fd_temp = get_acceptor_fd(i);
-        fd_max = max(fd_max, fd_temp);
+    int fd_temp;
+    fd_max = INT_MIN;
+    set<int> local_set = get_commander_fd_set();
+    FD_ZERO(&cfds_set);
+    cfds_vec.clear();
+     for(auto it=local_set.begin(); it!=local_set.end(); it++)
+    {
+        fd_temp = *it; 
+        if(fd_temp!=-1)
+        {
+            FD_SET(fd_temp, &cfds_set);
+            fd_max = max(fd_max, fd_temp);
+            cfds_vec.push_back(fd_temp);
+        }
     }
-    return fd_max;
 }
 
 void Server::SendToServers(const string& type, const string& msg)
@@ -240,19 +262,10 @@ void Server::SendToServers(const string& type, const string& msg)
     int serv_fd;
     for (int i = 0; i < num_servers_; i++)
     {
-        // if(i==get_pid())
-        // {
-        // if(type==kDecision)
-        // serv_fd = get_replica_fd();
-        // else if(type==kP2a || type==kP1a)
-        // serv_fd = get_self_acceptor_fd();
-        // }
-        // else{
         if (type == kDecision)
             serv_fd = get_replica_fd(i);
-        else if (type == kP2a || type == kP1a)
+        else if (type == kP1a) //p2a sent in commander
             serv_fd = get_acceptor_fd(i);
-        // }
 
         if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
             D(cout << ": ERROR: sending to " << (i) << endl;)
@@ -263,14 +276,24 @@ void Server::SendToServers(const string& type, const string& msg)
     }
 }
 
-void Server::Unicast(const string &type, const string& msg)
-{
-    if(type==kPreEmpted || type==kAdopted)
-        serv_fd = get_leader_fd(get_pid());
-    else if(type==kP2b)
-        serv_fd = get_commander_fd(get_pid());
-    else if(type==kP1b)
-        serv_fd = get_scout_fd(get_pid());
+void Server::Unicast(const string &type, const string& msg, int r_fd)
+{   
+    int serv_fd;
+    if(r_fd==-1)
+    {
+        if(type==kPreEmpted || type==kAdopted || type==kPropose)
+            serv_fd = get_leader_fd(get_pid());
+        else if(type==kP2b)
+            serv_fd = get_commander_fd(get_pid());
+        else if(type==kP1b)
+            serv_fd = get_scout_fd(get_pid());            
+    }
+    else
+    {
+        //as of now only used for commander to acceptor messages    
+        D(cout<<"using non default port for unicast"<<endl;)
+        serv_fd = r_fd;
+    }
 
     if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
         D(cout << ": ERROR: sending "<<type<< endl;)

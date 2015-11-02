@@ -104,7 +104,7 @@ void* AcceptConnectionsAcceptor(void* _S) {
 
         int incoming_port = ntohs(return_port_no((struct sockaddr *)&their_addr));
         // incoming connection must be from a commander.
-        AddToCommanderFDList(new_fd);
+        S->AddToCommanderFDSet(new_fd);
         S->SendBackOwnFD(new_fd);
     }
     pthread_exit(NULL);

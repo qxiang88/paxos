@@ -34,9 +34,9 @@ int Server::get_scout_listen_port(const int server_id) {
 }
 
 void Server::set_scout_fd(const int server_id, const int fd) {
-    if (fd == -1 || scout_fd_[server_id] == -1) {
+    // if (fd == -1 || scout_fd_[server_id] == -1) {
         scout_fd_[server_id] = fd;
-    }
+    // }
 }
 
 /**
@@ -70,23 +70,24 @@ void* Scout(void* _rcv_thread_arg) {
 
     int num_bytes;
     unordered_set<Triple> pvalues;
-    fd_set acceptor_set = S->GetAcceptorFdSet();
-    fd_set temp_set;
+    // fd_set temp_set;
 
-    int fd_max = S->GetMaxAcceptorFd();
     int num_servers = S->get_num_servers();
     int waitfor = num_servers;
     while (true) {  // always listen to messages from the acceptors
-        temp_set = acceptor_set;
-        int rv = select(fd_max + 1, &temp_set, NULL, NULL, NULL);
+        fd_set acceptor_set;
+        int fd_max;
+        S->GetAcceptorFdSet(acceptor_set, fd_max);
+        
+        int rv = select(fd_max + 1, &acceptor_set, NULL, NULL, NULL);
 
         if (rv == -1) { //error in select
             D(cout << "ERROR in select() for Scout" << endl;)
         } else if (rv == 0) {
-            break;
+            continue;
         } else {
             for (int i = 0; i < num_servers; i++) {
-                if (FD_ISSET(S->get_acceptor_fd(i), &temp_set)) { // we got one!!
+                if (FD_ISSET(S->get_acceptor_fd(i), &acceptor_set)) { // we got one!!
                     char buf[kMaxDataSize];
                     if ((num_bytes = recv(S->get_acceptor_fd(i), buf, kMaxDataSize - 1, 0)) == -1) {
                         D(cout << "ERROR in receiving p1b from " << i << endl;)

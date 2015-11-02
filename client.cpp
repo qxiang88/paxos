@@ -105,7 +105,7 @@ bool Client::ReadPortsFile() {
             fin >> port >> port >> port;
             fin >> port;
             primary_listen_port_[i] = port;
-            fin >> port >> port >> port;
+            fin >> port >> port >> port >> port;
         }
 
         fin.close();
@@ -141,8 +141,8 @@ void Client::Initialize(const int pid,
  */
 void Client::SendChatToPrimary(const int chat_id, const string &chat_message) {
     string msg = kChat + kInternalDelim +
-                 to_string(get_pid()) + kInternalDelim +
-                 to_string(chat_id) + kInternalDelim +
+                 to_string(get_pid()) + kInternalStructDelim +
+                 to_string(chat_id) + kInternalStructDelim +
                  chat_message + kMessageDelim;
     int primary_id = get_primary_id();
     if (send(get_primary_fd(), msg.c_str(), msg.size(), 0) == -1) {
@@ -173,11 +173,13 @@ void Client::AddChatToChatList(const string &chat) {
 void Client::AddToFinalChatLog(const string &sequence_num,
                                const string &sender_index,
                                const string &body) {
-    const int n = sequence_num.size();
-    char buf[n + 1];
-    sequence_num.copy(buf, sequence_num.size(), 0);
-    buf[n] = '\0';
-    int seq_num = atoi(buf);
+    // const int n = sequence_num.size();
+    // char buf[n + 1];
+    // sequence_num.copy(buf, sequence_num.size(), 0);
+    // buf[n] = '\0';
+    // int seq_num = atoi(buf);
+
+    int seq_num = stoi(sequence_num);
 
     pthread_mutex_lock(&final_chat_log_lock);
 
@@ -304,10 +306,12 @@ void* ReceiveMessagesFromPrimary(void* _C) {
             std::vector<string> message = split(string(buf), kMessageDelim[0]);
             for (const auto &msg : message) {
                 std::vector<string> token = split(string(msg), kInternalDelim[0]);
-                // token[0] = sequence number of chat as assigned by Paxos
-                // token[1] = id of original sender of chat message
-                // token[2] = chat message body
-                C->AddToFinalChatLog(token[0], token[1], token[2]);
+                // token[0] = kresponse
+                // token[1] = sequence number of chat as assigned by Paxos
+                // token[2] = (client id) id of original sender of chat message
+                // token[3] = (chat id)
+                // token[4] = (msg) chat message body
+                C->AddToFinalChatLog(token[1], token[2], token[4]);
             }
         }
     }

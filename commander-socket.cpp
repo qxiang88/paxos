@@ -116,9 +116,8 @@ void* AcceptConnectionsCommander(void* _S) {
                 // if (process_id != -1) { //incoming connection from an acceptor
                 //     S->set_acceptor_fd(process_id, new_fd);
                 // } else {
-                    D(cout << "SC" << S->get_pid() << ": ERROR: Unexpected connect request from port "
-                      << incoming_port << endl;)
-                }
+                D(cout << "SC" << S->get_pid() << ": ERROR: Unexpected connect request from port "
+                  << incoming_port << endl;)
             }
         }
         pthread_exit(NULL);
@@ -133,10 +132,13 @@ void* AcceptConnectionsCommander(void* _S) {
 bool Server::ConnectToAcceptor(const int server_id) {
     if (get_acceptor_fd(server_id) != -1) return true;
 
-    // set up addrinfo for server
+    int sockfd;
     int numbytes;
-    struct addrinfo *servinfo;
+    struct addrinfo hints, *servinfo, *l;
     char s[INET6_ADDRSTRLEN];
+    int rv;
+
+    // set up addrinfo for server
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;

@@ -34,16 +34,16 @@ int Server::get_acceptor_port(const int server_id) {
 }
 
 void Server::set_acceptor_fd(const int server_id, const int fd) {
-    if (fd == -1 || acceptor_fd_[server_id] == -1) {
+    // if (fd == -1 || acceptor_fd_[server_id] == -1) {
         acceptor_fd_[server_id] = fd;
-    }
+    // }
 }
 
 /**
  * adds the fd for communication with a commander to commander_fd_set_
  * @param fd fd to be added
  */
-void Server::AddToCommanderFdSet(const int fd) {
+void Server::AddToCommanderFDSet(const int fd) {
     commander_fd_set_.insert(fd);
 }
 
@@ -51,7 +51,8 @@ void Server::AddToCommanderFdSet(const int fd) {
  * removes the fd for communication with a commander from commander_fd_set_
  * @param fd fd to be removed
  */
-void Server::RemoveFromCommanderFdSet(const int fd) {
+void Server::RemoveFromCommanderFDSet(const int fd) {
+    close(fd);
     commander_fd_set_.erase(fd);
 }
 
@@ -65,7 +66,7 @@ void Server::SendBackOwnFD(const int fd) {
     if (send(fd, msg.c_str(), msg.size(), 0) == -1) {
         D(cout << "SA" << get_pid() << ": ERROR: Cannot send fd to commander" << endl;)
         //TODO: delete this fd from the commander fd set?
-        RemoveFromCommanderFdSet(fd);
+        RemoveFromCommanderFDSet(fd);
     } else {
         D(cout << "SA" << get_pid() << ": fd sent to commander" << endl;)
     }
@@ -115,6 +116,8 @@ void *AcceptorEntry(void *_S) {
           << S->get_primary_id() << endl;)
         return NULL;
     }
+
+    S->Acceptor();
 }
 void Server::SendP1b(const Ballot& b, const unordered_set<Triple> &st)
 {
@@ -124,54 +127,63 @@ void Server::SendP1b(const Ballot& b, const unordered_set<Triple> &st)
     Unicast(kP1b, msg);
 }
 
-void Server::SendP2b(const Ballot& b)
+void Server::SendP2b(const Ballot& b, int return_fd)
 {
     string msg = kP2b + kInternalDelim + to_string(get_pid());
     msg += kInternalDelim + ballotToString(b) + kMessageDelim;
-    Unicast(kP2b, msg);
+    Unicast(kP2b, msg, return_fd);
 }
 
 void Server::Acceptor()
 {
-    accepted_.clear();
+    // accepted_.clear();
     ballot_num_.id = INT_MIN;
     ballot_num_.seq_num = INT_MIN;
 
     char buf[kMaxDataSize];
     int num_bytes;
 
-    fd_set subleaders, temp_set;
+    fd_set recv_from;
     vector<int> fds;
-    int fd_max = INT_MIN, fd_temp;
-    FD_ZERO(&subleaders);
-
-    fd_temp = get_commander_fd(get_primary_id());
-    fd_max = max(fd_max, fd_temp);
-    fds.insert(fd_temp);
-    FD_SET(fd_temp, &subleaders);
-    fd_temp = get_scout_fd(get_primary_id());
-    fd_max = max(fd_max, fd_temp);
-    fds.insert(fd_temp);
-    FD_SET(fd_temp, &subleaders);
+    
+    // fd_temp = get_commander_fd(get_primary_id());
 
     while (true) {  // always listen to messages from the acceptors
-        temp_set = subleaders;
-        int rv = select(fd_max + 1, &temp_set, NULL, NULL, NULL);
+
+        int fd_max, fd_temp;
+        GetCommanderFdSet(recv_from, fds, fd_max);
+        fd_temp = get_scout_fd(get_primary_id());
+        if(fd_temp!=-1)
+        {
+            fds.push_back(fd_temp);
+            FD_SET(fd_temp, &recv_from);
+            fd_max = max(fd_max, fd_temp);
+        }
+
+        if(fds.empty()) {
+            usleep(kSelectSleep);
+            continue;
+        }
+
+        int rv = select(fd_max + 1, &recv_from, NULL, NULL, NULL);
 
         if (rv == -1) { //error in select
-            D(cout << "ERROR in select() for Acceptor" << endl;)
+            D(cout << "SA" << get_pid() << ": ERROR in select() for Acceptor" << endl;)
         } else if (rv == 0) {
-            D(cout << "Unexpected select timeout in Acceptor" << endl;)
-            break;
+            D(cout << "SA" << get_pid() << ": Unexpected select timeout in Acceptor" << endl;)
+            continue;
         } else {
-            for (int i = 0; i < 2; i++) {
-                if (FD_ISSET(fds[i], &temp_set)) { // we got one!!
+            for (int i = 0; i < fds.size(); i++) {
+                if (FD_ISSET(fds[i], &recv_from)) { // we got one!!
                     char buf[kMaxDataSize];
                     if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1) {
-                        D(cout << "ERROR in receiving from scout or leader" << endl;)
-                        // pthread_exit(NULL); //TODO: think about whether it should be exit or not
+                        D(cout << "SA" << get_pid() << ": ERROR in receiving from scout or commander"<< endl;)
+                        if(i!=fds.size()-1)
+                            RemoveFromCommanderFDSet(fds[i]);
                     } else if (num_bytes == 0) {     //connection closed
-                        D(cout << "Accepter connection for " << get_pid() << " closed by leader." << endl;)
+                        D(cout << "SA" << get_pid() << ": Connection closed by scout or commander."<< endl;)
+                        if(i!=fds.size()-1)
+                            RemoveFromCommanderFDSet(fds[i]);
                     } else {
                         buf[num_bytes] = '\0';
                         std::vector<string> message = split(string(buf), kMessageDelim[0]);
@@ -179,30 +191,28 @@ void Server::Acceptor()
                             std::vector<string> token = split(string(msg), kInternalDelim[0]);
                             if (token[0] == kP1a)
                             {
-                                D(cout << get_pid() << " received P1a" << "message" <<  endl;)
+                                D(cout << "SA" << get_pid() << ": Received P1a message" <<  endl;)
 
                                 Ballot recvd_ballot = stringToBallot(token[2]);
                                 if (recvd_ballot > ballot_num_)
                                     ballot_num_ = recvd_ballot;
-
-                                SendP1b(recvd_ballot, accepted_);
-
+                                SendP1b(ballot_num_, accepted_);
                             }
                             else if (token[0] == kP2a)
                             {
-                                D(cout << get_pid() << " received P2a" << "message" <<  endl;)
+                                D(cout << "SA" << get_pid() << ": Received P2a message" <<  endl;)
 
+                                int return_fd = stoi(token[1]);
                                 Triple recvd_triple = stringToTriple(token[2]);
                                 if (recvd_triple.b >= ballot_num_)
                                 {
                                     ballot_num_ = recvd_triple.b;
                                     accepted_.insert(recvd_triple);
                                 }
-                                SendP2b(ballot_num_);
-
+                                SendP2b(ballot_num_, return_fd);
                             }
                             else {    //other messages
-                                D(cout << "Unexpected message in Acceptor " << msg << endl;)
+                                D(cout << "SA" << get_pid() << ": Unexpected message in Acceptor " << msg << endl;)
                             }
                         }
                     }

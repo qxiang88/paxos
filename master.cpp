@@ -128,7 +128,7 @@ bool Master::ReadPortsFile() {
         for (int i = 0; i < num_servers_; i++) {
             fin >> port;
             server_listen_port_[i] = port;
-            for (int j = 0; j < 6; ++j) {
+            for (int j = 0; j < 7; ++j) {
                 fin>>port;
             }
         }

@@ -31,9 +31,9 @@ int Server::get_leader_port(const int server_id) {
 }
 
 void Server::set_leader_fd(const int server_id, const int fd) {
-    if (fd == -1 || leader_fd_[server_id] == -1) {
+    // if (fd == -1 || leader_fd_[server_id] == -1) {
         leader_fd_[server_id] = fd;
-    }
+    // }
 }
 
 /**
@@ -88,6 +88,8 @@ void *LeaderEntry(void *_S) {
           << S->get_primary_id() << endl;)
         return NULL;
     }
+
+    S->Leader();
 }
 
 void Server::Leader()
@@ -169,11 +171,4 @@ void Server::Leader()
         }
       }
     
-}
-//actually leader thread for each replica required. but here only one replica sends leader anything
-void* LeaderThread(void* _rcv_thread_arg) {
-    LeaderThreadArgument *rcv_thread_arg = (LeaderThreadArgument *)_rcv_thread_arg;
-    Server *S = rcv_thread_arg->S;
-    S->Leader();
-    return NULL;
 }

@@ -24,44 +24,56 @@ public:
     bool ReadPortsFile();
     void CreateReceiveThreadsForClients();
     bool ConnectToServer(const int server_id);
+    void ConnectToAllAcceptors(std::vector<int> &acceptor_peer_fd);
 
     void SendP1a(const Ballot& b);
-    void SendP2a(const Triple& t);
+    void SendP2a(const Triple& , vector<int> );
+    void SendP1b(const Ballot& b, const unordered_set<Triple> &st);
+    void SendP2b(const Ballot& , int);
     void SendDecision(const Triple& t);
     void SendAdopted(const Ballot& recvd_ballot, unordered_set<Triple> pvalues);
     void SendPreEmpted(const Ballot& b);
-
+    void SendProposal(const int &, const Proposal&);
     void SendToServers(const string& type, const string& msg);
     void SendToLeader(const string&);
+    void Unicast(const string &type, const string& msg, int r_fd = -1);
+    void SendResponseToClient(const int& , const Proposal&);
+
     int GetMaxAcceptorFd();
-    fd_set GetAcceptorFdSet();
-    void AddToCommanderFdSet(const int fd);
-    void RemoveFromCommanderFdSet(const int fd);
+    void GetAcceptorFdSet(fd_set&, int&);
+    void GetCommanderFdSet(fd_set&, vector<int>&, int&);
+    void AddToCommanderFDSet(const int fd);
+    void RemoveFromCommanderFDSet(const int fd);
     void SendBackOwnFD(const int fd);
 
     void IncrementSlotNum();
     void IncrementBallotNum();
     void CommanderAcceptThread();
     void ScoutAcceptThread();
-    void Propose(const Proposal &p);
     bool ConnectToCommanderL(const int server_id);
     bool ConnectToCommanderR(const int server_id);
-    bool ConnectToCommanderA(const int server_id);
     bool ConnectToScoutL(const int server_id);
     bool ConnectToScoutR(const int server_id);
     bool ConnectToScoutA(const int server_id);
     bool ConnectToReplica(const int server_id);
+    bool ConnectToAcceptor(const int server_id);
+
     void Leader();
     void Acceptor();
 
+    void Replica();
+    void Perform(const int&, const Proposal&);
+    void Propose(const Proposal &p);
 
     int get_pid();
     int get_commander_fd(const int server_id);
+    set<int> get_commander_fd_set();
     int get_scout_fd(const int server_id);
     int get_replica_fd(const int server_id);
     int get_acceptor_fd(const int server_id);
     int get_leader_fd(const int server_id);
     int get_num_servers();
+    int get_num_clients();
     int get_client_chat_fd(const int client_id);
     int get_master_port();
     int get_server_listen_port(const int server_id);
@@ -69,6 +81,7 @@ public:
     int get_commander_listen_port(const int client_id);
     int get_scout_listen_port(const int client_id);
     int get_replica_listen_port(const int client_id);
+    int get_acceptor_listen_port(const int server_id);
     int get_client_chat_port(const int client_id);
     int get_acceptor_port(const int client_id);
     int get_replica_port(const int client_id);

@@ -40,9 +40,11 @@ const string kDecision = "DECISION";
 const string kPreEmpted = "PREEMPTED";
 const string kAdopted = "ADOPTED";
 const string kPropose = "PROPOSE";
+const string kResponse = "RESPONSE";
 
 // sleep values
 const time_t kGeneralSleep = 1000 * 1000;
+const time_t kSelectSleep = 500 * 1000;
 
 // timeout values
 const timeval kReceiveTimeoutTimeval = {
