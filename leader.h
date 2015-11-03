@@ -34,6 +34,8 @@ public:
     Leader(Server* S);
 
     Server *S;
+    std::map<int, Proposal> proposals_;
+
 private:
     Ballot ballot_num_;
     bool leader_active_;
@@ -41,6 +43,7 @@ private:
     std::vector<int> commander_fd_;
     std::vector<int> scout_fd_;
     std::vector<int> replica_fd_;
+
 
 };
 

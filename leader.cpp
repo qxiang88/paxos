@@ -148,7 +148,7 @@ void Leader::LeaderMode()
     char buf[kMaxDataSize];
     int num_bytes;
     int num_servers = S->get_num_servers();
-    while (true) {  // always listen to messages from the acceptors
+    while (true) {
         if ((num_bytes = recv(get_replica_fd(S->get_primary_id()), buf, kMaxDataSize - 1, 0)) == -1)
         {
             D(cout << "SL" << S->get_pid() << ": ERROR in receving from primary replica" << endl;)
@@ -160,38 +160,43 @@ void Leader::LeaderMode()
             std::vector<string> message = split(string(buf), kMessageDelim[0]);
             for (const auto &msg : message)
             {
+                // D(cout << "SL" << S->get_pid() << ": Message received: " << msg <<  endl;)
                 std::vector<string> token = split(string(msg), kInternalDelim[0]);
                 if (token[0] == kPropose)
                 {
-                    D(cout << "SL" << S->get_pid() << ": Propose message received: " << buf <<  endl;)
-                    if (S->proposals_.find(stoi(token[1])) == S->proposals_.end())
+                    D(cout << "SL" << S->get_pid() << ": Propose message received: " << msg <<  endl;)
+                    if (proposals_.find(stoi(token[1])) == proposals_.end())
                     {
-                        S->proposals_[stoi(token[1])] = stringToProposal(token[2]);
+                        proposals_[stoi(token[1])] = stringToProposal(token[2]);
                         if (get_leader_active())
                         {
-                            // scout
-                            // pthread_t scout_thread;
-                            ScoutThreadArgument* arg = new ScoutThreadArgument;
-                            arg->SC = S->get_scout_object();
-                            arg->ball = get_ballot_num();;
-                            CreateThread(ScoutMode, (void*)arg, scout_thread);
+                            // commander
+                            cout << "HERE" << endl;
+                            pthread_t commander_thread;
+                            Commander C(S);
+                            CommanderThreadArgument* arg = new CommanderThreadArgument;
+                            arg->C = &C;
+                            Triple tempt = Triple(get_ballot_num(), stoi(token[1]), proposals_[stoi(token[1])]);
+                            arg->toSend = &tempt;
+                            CreateThread(CommanderMode, (void*)arg, commander_thread);
                         }
                     }
                 }
                 else if (token[0] == kAdopted)
                 {
+                    D(cout << "SL" << S->get_pid() << ": Adopted message received: " << msg <<  endl;)
                     unordered_set<Triple> pvalues = stringToTripleSet(token[2]);
-                    S->proposals_ = pairxor(S->proposals_, pmax(pvalues));
+                    proposals_ = pairxor(proposals_, pmax(pvalues));
 
-                    pthread_t commander_thread[S->proposals_.size()];
+                    pthread_t commander_thread[proposals_.size()];
                     int i = 0;
-                    for (auto it = S->proposals_.begin(); it != S->proposals_.end(); it++)
+                    for (auto it = proposals_.begin(); it != proposals_.end(); it++)
                     {
                         // commander
                         Commander C(S);
                         CommanderThreadArgument* arg = new CommanderThreadArgument;
                         arg->C = &C;
-                        Triple tempt = Triple(get_ballot_num(), stoi(token[1]), S->proposals_[stoi(token[1])]);
+                        Triple tempt = Triple(get_ballot_num(), stoi(token[1]), proposals_[stoi(token[1])]);
                         arg->toSend = &tempt;
                         CreateThread(CommanderMode, (void*)arg, commander_thread[i]);
                         i++;
@@ -201,6 +206,7 @@ void Leader::LeaderMode()
 
                 else if (token[0] == kPreEmpted)
                 {
+                    D(cout << "SL" << S->get_pid() << ": PreEmpted message received: " << buf <<  endl;)
                     Ballot recvd_b = stringToBallot(token[1]);
                     if (recvd_b > get_ballot_num())
                     {

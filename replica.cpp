@@ -118,21 +118,21 @@ void Replica::Unicast(const string &type, const string& msg)
  * @param p Proposal to be proposed
  */
 void Replica::Propose(const Proposal &p) {
-    for (auto it = S->decisions_.begin(); it != S->decisions_.end(); ++it ) {
+    for (auto it = decisions_.begin(); it != decisions_.end(); ++it ) {
         if (it->second == p)
             return;
     }
 
     int min_slot;
-    if (S->proposals_.rbegin() == S->proposals_.rend())
+    if (proposals_.rbegin() == proposals_.rend())
         min_slot = 0;
     else
-        min_slot = S->proposals_.rbegin()->first;
+        min_slot = proposals_.rbegin()->first;
 
-    while (S->decisions_.find(min_slot) != S->decisions_.end())
+    while (decisions_.find(min_slot) != decisions_.end())
         min_slot++;
 
-    S->proposals_[min_slot] = p;
+    proposals_[min_slot] = p;
     SendProposal(min_slot, p);
 }
 
@@ -157,7 +157,7 @@ void Replica::SendProposal(const int& s, const Proposal& p)
  */
 void Replica::Perform(const int& slot, const Proposal& p)
 {
-    for (auto it = S->decisions_.begin(); it != S->decisions_.end(); it++)
+    for (auto it = decisions_.begin(); it != decisions_.end(); it++)
     {
         if (it->second == p && it->first < get_slot_num())
         {   //think why not increase in loop
@@ -250,17 +250,17 @@ void Replica::ReplicaMode()
                                 D(cout << "SR" << S->get_pid() << ": Received decision: " << buf <<  endl;)
                                 int s = stoi(token[1]);
                                 Proposal p = stringToProposal(token[2]);
-                                S->decisions_[s] = p;
+                                decisions_[s] = p;
 
                                 Proposal currdecision;
                                 int slot_num = get_slot_num();
-                                while (S->decisions_.find(slot_num) != S->decisions_.end())
+                                while (decisions_.find(slot_num) != decisions_.end())
                                 {
-                                    currdecision = S->decisions_[slot_num];
-                                    if (S->proposals_.find(slot_num) != S->proposals_.end())
+                                    currdecision = decisions_[slot_num];
+                                    if (proposals_.find(slot_num) != proposals_.end())
                                     {
-                                        if (!(S->proposals_[slot_num] == currdecision))
-                                            Propose(S->proposals_[slot_num]);
+                                        if (!(proposals_[slot_num] == currdecision))
+                                            Propose(proposals_[slot_num]);
                                     }
                                     Perform(slot_num, currdecision);
                                     //s has to slot_num. check if it is slotnum in recovery too.

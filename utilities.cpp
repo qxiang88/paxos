@@ -107,6 +107,8 @@ string proposalToString(const Proposal& p)
     string s = p.client_id;
     s+=kInternalStructDelim;
     s += p.chat_id;
+    s+=kInternalStructDelim;
+    s += p.msg;
     return s;
 }
 

@@ -50,10 +50,6 @@ public:
     void set_primary_id(const int primary_id);
     void set_scout_object();
 
-    std::map<int, Proposal> proposals_;
-    std::map<int, Proposal> decisions_;
-    std::unordered_set<Triple> accepted_;
-
 private:
     int pid_;   // server's ID
     int num_servers_;

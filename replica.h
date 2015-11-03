@@ -42,6 +42,8 @@ public:
     Replica(Server *_S);
 
     Server *S;
+    std::map<int, Proposal> proposals_;
+    std::map<int, Proposal> decisions_;
 
 private:
     int slot_num_;
