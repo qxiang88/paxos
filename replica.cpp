@@ -177,6 +177,9 @@ void Replica::Perform(const int& slot, const Proposal& p)
  */
 void Replica::SendResponseToAllClients(const int& s, const Proposal& p)
 {
+    if(S->get_pid()!=S->get_primary_id())
+        return;
+
     string msg = kResponse + kInternalDelim;
     msg += to_string(s) + kInternalDelim;
     msg += proposalToString(p) + kMessageDelim;
@@ -210,6 +213,9 @@ void Replica::ReplicaMode()
         for (int i = 0; i < S->get_num_clients(); i++)
         {
             fd_temp = get_client_chat_fd(i);
+            if(fd_temp == -1)
+                continue;
+
             fd_max = max(fd_max, fd_temp);
             fds.push_back(fd_temp);
             FD_SET(fd_temp, &fromset);
@@ -364,11 +370,11 @@ void* ReplicaEntry(void *_S) {
     usleep(kGeneralSleep);
     usleep(kGeneralSleep);
     usleep(kGeneralSleep);
-    if (R.S->get_pid() == primary_id) {
-        R.CreateReceiveThreadsForClients();
-    }
+    // if (R.S->get_pid() == primary_id) {
+    //     R.CreateReceiveThreadsForClients();
+    // }
 
-    // R.ReplicaMode();
+    R.ReplicaMode();
 
     void *status;
     pthread_join(accept_connections_thread, &status);

@@ -67,7 +67,11 @@ std::vector<std::string> &split(const std::string &s, char delim, std::vector<st
 
 std::vector<std::string> split(const std::string &s, char delim) {
     std::vector<std::string> elems;
+    if(s=="")
+        return elems;
+    
     split(s, delim, elems);
+
     return elems;
 }
 
@@ -139,15 +143,17 @@ Triple stringToTriple(const string& s)
     Proposal p;
     Ballot b;
     vector<string> parts = split(s, kInternalStructDelim[0]);
-    if(parts.size()!=6)D(cout<<"Error not proper triple. Size is "<<parts.size()<<endl;)
-    b.id = stoi(parts[0]);
-    b.seq_num = stoi(parts[1]);
-    t.b = b;
-    t.s = stoi(parts[2]);
-    p.client_id = parts[3];
-    p.chat_id = parts[4];
-    p.msg = parts[5];
-    t.p = p;
+    if(parts.size()==6)
+    {
+        b.id = stoi(parts[0]);
+        b.seq_num = stoi(parts[1]);
+        t.b = b;
+        t.s = stoi(parts[2]);
+        p.client_id = parts[3];
+        p.chat_id = parts[4];
+        p.msg = parts[5];
+        t.p = p;
+    }
     return t;
 }
 

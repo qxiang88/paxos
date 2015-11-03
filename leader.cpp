@@ -11,6 +11,7 @@
 #include "signal.h"
 #include "errno.h"
 #include "sys/socket.h"
+#include "limits.h"
 using namespace std;
 
 typedef pair<int, Proposal> SPtuple;
@@ -88,6 +89,28 @@ void Leader::IncrementBallotNum() {
     set_ballot_num(b);
 }
 
+void Leader::GetFdSet(fd_set& recv_from_set, int& fd_max, vector<int>& fds)
+{
+    fd_max = INT_MIN;
+    int fd_temp;
+    FD_ZERO(&recv_from_set);
+    fds.clear();
+    
+    fd_temp = get_replica_fd(S->get_pid());
+    FD_SET(fd_temp, &recv_from_set);
+    fd_max = max(fd_max, fd_temp);
+    fds.push_back(fd_temp);
+
+    fd_temp = get_scout_fd(S->get_pid());
+    FD_SET(fd_temp, &recv_from_set);
+    fd_max = max(fd_max, fd_temp);
+    fds.push_back(fd_temp);
+
+    fd_temp = get_commander_fd(S->get_pid());
+    FD_SET(fd_temp, &recv_from_set);
+    fd_max = max(fd_max, fd_temp);
+    fds.push_back(fd_temp);
+}
 /**
  * thread entry function for leader
  * @param  _S pointer to server class object
@@ -145,86 +168,112 @@ void Leader::LeaderMode()
     arg->ball = get_ballot_num();
     CreateThread(ScoutMode, (void*)arg, scout_thread);
 
-    char buf[kMaxDataSize];
-    int num_bytes;
+    
     int num_servers = S->get_num_servers();
+
     while (true) {
-        if ((num_bytes = recv(get_replica_fd(S->get_primary_id()), buf, kMaxDataSize - 1, 0)) == -1)
-        {
-            D(cout << "SL" << S->get_pid() << ": ERROR in receving from primary replica" << endl;)
-            // pthread_exit(NULL); //TODO: think about whether it should be exit or not
-        } else if (num_bytes == 0) {     //connection closed
-            D(cout << "SL" << S->get_pid() << ": ERROR Connection closed by primary replica" << endl;)
+        fd_set recv_from_set;
+        int fd_max;
+        vector<int> fds;
+        GetFdSet(recv_from_set, fd_max, fds);
+
+        int rv = select(fd_max + 1, &recv_from_set, NULL, NULL, NULL);
+        
+        if (rv == -1) { //error in select
+            D(cout << "SL" << S->get_pid() << ": ERROR in select()" << endl;)
+        } else if (rv == 0) {
+            D(cout << "SL" << S->get_pid() << ": ERROR Unexpected select timeout" << endl;)
         } else {
-            buf[num_bytes] = '\0';
-            std::vector<string> message = split(string(buf), kMessageDelim[0]);
-            for (const auto &msg : message)
+            for(int i=0;i<fds.size();i++)
             {
-                // D(cout << "SL" << S->get_pid() << ": Message received: " << msg <<  endl;)
-                std::vector<string> token = split(string(msg), kInternalDelim[0]);
-                if (token[0] == kPropose)
-                {
-                    D(cout << "SL" << S->get_pid() << ": Propose message received: " << msg <<  endl;)
-                    if (proposals_.find(stoi(token[1])) == proposals_.end())
+                if (FD_ISSET(fds[i], &recv_from_set)) { // we got one!!
+                    char buf[kMaxDataSize];
+                    int num_bytes;
+                    if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1)
                     {
-                        proposals_[stoi(token[1])] = stringToProposal(token[2]);
-                        if (get_leader_active())
+                        D(cout << "SL" << S->get_pid() << ": ERROR in receving" << endl;)
+                        // pthread_exit(NULL); //TODO: think about whether it should be exit or not
+                    } else if (num_bytes == 0) {     //connection closed
+                        D(cout << "SL" << S->get_pid() << ": ERROR Connection closed" << endl;)
+                    } else {
+                        buf[num_bytes] = '\0';
+                        std::vector<string> message = split(string(buf), kMessageDelim[0]);
+                        for (const auto &msg : message)
                         {
-                            // commander
-                            cout << "HERE" << endl;
-                            pthread_t commander_thread;
-                            Commander C(S);
-                            CommanderThreadArgument* arg = new CommanderThreadArgument;
-                            arg->C = &C;
-                            Triple tempt = Triple(get_ballot_num(), stoi(token[1]), proposals_[stoi(token[1])]);
-                            arg->toSend = &tempt;
-                            CreateThread(CommanderMode, (void*)arg, commander_thread);
+                            // D(cout << "SL" << S->get_pid() << ": Message received: " << msg <<  endl;)
+                            std::vector<string> token = split(string(msg), kInternalDelim[0]);
+                            if (token[0] == kPropose)
+                            {
+                                D(cout << "SL" << S->get_pid() << ": Propose message received: " << msg <<  endl;)
+                                if (proposals_.find(stoi(token[1])) == proposals_.end())
+                                {
+                                    proposals_[stoi(token[1])] = stringToProposal(token[2]);
+                                    if (get_leader_active())
+                                    {
+                                        // commander
+                                        pthread_t commander_thread;
+                                        Commander C(S);
+                                        CommanderThreadArgument* arg = new CommanderThreadArgument;
+                                        arg->C = &C;
+                                        Triple tempt = Triple(get_ballot_num(), stoi(token[1]), proposals_[stoi(token[1])]);
+                                        arg->toSend = &tempt;
+                                        CreateThread(CommanderMode, (void*)arg, commander_thread);
+                                    }
+                                }
+                            }
+                            else if (token[0] == kAdopted)
+                            {
+                                D(cout << "SL" << S->get_pid() << ": Adopted message received: " << msg <<  endl;)
+
+                                unordered_set<Triple> pvalues;
+                                if(token.size()==3)
+                                    {
+                                        pvalues = stringToTripleSet(token[2]);
+                                        proposals_ = pairxor(proposals_, pmax(pvalues));
+                                    }
+
+                                pthread_t commander_thread[proposals_.size()];
+                                int i = 0;
+                                for (auto it = proposals_.begin(); it != proposals_.end(); it++)
+                                {
+                                    // commander
+                                    Commander C(S);
+                                    CommanderThreadArgument* arg = new CommanderThreadArgument;
+                                    arg->C = &C;
+                                    Triple tempt = Triple(get_ballot_num(), stoi(token[1]), proposals_[stoi(token[1])]);
+                                    arg->toSend = &tempt;
+                                    CreateThread(CommanderMode, (void*)arg, commander_thread[i]);
+                                    i++;
+                                }
+                                set_leader_active(true);
+                            }
+
+                            else if (token[0] == kPreEmpted)
+                            {
+                                D(cout << "SL" << S->get_pid() << ": PreEmpted message received: " << buf <<  endl;)
+                                Ballot recvd_b = stringToBallot(token[1]);
+                                if (recvd_b > get_ballot_num())
+                                {
+                                    set_leader_active(false);
+                                    IncrementBallotNum();
+
+                                    // scout
+                                    // pthread_t scout_thread;
+                                    ScoutThreadArgument* arg = new ScoutThreadArgument;
+                                    arg->SC = S->get_scout_object();
+                                    arg->ball = get_ballot_num();
+                                    CreateThread(ScoutMode, (void*)arg, scout_thread);
+                                }
+                            }
+                            else {    //other messages
+                                D(cout << "SL" << S->get_pid() << ": ERROR: Unexpected message received: " << msg << endl;)
+                            }
                         }
                     }
-                }
-                else if (token[0] == kAdopted)
-                {
-                    D(cout << "SL" << S->get_pid() << ": Adopted message received: " << msg <<  endl;)
-                    unordered_set<Triple> pvalues = stringToTripleSet(token[2]);
-                    proposals_ = pairxor(proposals_, pmax(pvalues));
-
-                    pthread_t commander_thread[proposals_.size()];
-                    int i = 0;
-                    for (auto it = proposals_.begin(); it != proposals_.end(); it++)
-                    {
-                        // commander
-                        Commander C(S);
-                        CommanderThreadArgument* arg = new CommanderThreadArgument;
-                        arg->C = &C;
-                        Triple tempt = Triple(get_ballot_num(), stoi(token[1]), proposals_[stoi(token[1])]);
-                        arg->toSend = &tempt;
-                        CreateThread(CommanderMode, (void*)arg, commander_thread[i]);
-                        i++;
-                    }
-                    set_leader_active(true);
-                }
-
-                else if (token[0] == kPreEmpted)
-                {
-                    D(cout << "SL" << S->get_pid() << ": PreEmpted message received: " << buf <<  endl;)
-                    Ballot recvd_b = stringToBallot(token[1]);
-                    if (recvd_b > get_ballot_num())
-                    {
-                        set_leader_active(false);
-                        IncrementBallotNum();
-
-                        // scout
-                        // pthread_t scout_thread;
-                        ScoutThreadArgument* arg = new ScoutThreadArgument;
-                        arg->SC = S->get_scout_object();
-                        arg->ball = get_ballot_num();
-                        CreateThread(ScoutMode, (void*)arg, scout_thread);
-                    }
-                }
-                else {    //other messages
-                    D(cout << "SL" << S->get_pid() << ": ERROR: Unexpected message received: " << msg << endl;)
                 }
             }
         }
     }
+
+    D(cout<<"Leader exiting"<<endl;)
 }

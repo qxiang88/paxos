@@ -165,7 +165,6 @@ void Acceptor::SendP2b(const Ballot& b, int return_fd)
  */
 void Acceptor::AcceptorMode()
 {
-    char buf[kMaxDataSize];
     int num_bytes;
 
     fd_set recv_from;

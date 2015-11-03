@@ -137,7 +137,7 @@ void Commander::SendPreEmpted(const Ballot& b)
 void Commander::ConnectToAllAcceptors(std::vector<int> &acceptor_peer_fd) {
     for (int i = 0; i < S->get_num_servers(); ++i) {
         if (!ConnectToAcceptor(i)) {
-            D(cout << "SC" << S->get_pid() << ": ERROR in connecting to acceptor S " << i << endl;)
+            D(cout << "SC" << S->get_pid() << ": ERROR in connecting to acceptor S" << i << endl;)
         } else {
             int num_bytes;
             char buf[kMaxDataSize];

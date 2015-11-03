@@ -142,7 +142,6 @@ void* ScoutMode(void* _rcv_thread_arg) {
         SC->GetAcceptorFdSet(acceptor_set, fd_max);
 
         int rv = select(fd_max + 1, &acceptor_set, NULL, NULL, NULL);
-
         if (rv == -1) { //error in select
             D(cout << "SS" << SC->S->get_pid() << ": ERROR in select()" << endl;)
         } else if (rv == 0) {
@@ -168,11 +167,15 @@ void* ScoutMode(void* _rcv_thread_arg) {
                             std::vector<string> token = split(string(msg), kInternalDelim[0]);
                             if (token[0] == kP1b) {
                                 D(cout << "SS" << SC->S->get_pid() << ": received P1B from acceptor S" << i <<  endl;)
-
+                                
                                 Ballot recvd_ballot = stringToBallot(token[2]);
-                                unordered_set<Triple> r = stringToTripleSet(token[3]);
+                                unordered_set<Triple> r;
+
+                                if(token.size()==4)
+                                    r = stringToTripleSet(token[3]);
+                                
                                 if (recvd_ballot == ball)
-                                {
+                                {  
                                     union_set(pvalues, r);
                                     waitfor--;
                                     if (waitfor < (num_servers / 2))
@@ -187,11 +190,13 @@ void* ScoutMode(void* _rcv_thread_arg) {
                             } else {    //other messages
                                 D(cout << "SS" << SC->S->get_pid() << ": ERROR Unexpected message received: " << msg << endl;)
                             }
+
                         }
                     }
                 }
             }
         }
     }
+    D(cout<<"Scout exiting"<<endl;)
     return NULL;
 }
