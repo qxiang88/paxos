@@ -173,12 +173,6 @@ void Client::AddChatToChatList(const string &chat) {
 void Client::AddToFinalChatLog(const string &sequence_num,
                                const string &sender_index,
                                const string &body) {
-    // const int n = sequence_num.size();
-    // char buf[n + 1];
-    // sequence_num.copy(buf, sequence_num.size(), 0);
-    // buf[n] = '\0';
-    // int seq_num = atoi(buf);
-
     int seq_num = stoi(sequence_num);
 
     pthread_mutex_lock(&final_chat_log_lock);

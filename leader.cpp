@@ -144,7 +144,7 @@ void Leader::LeaderMode()
     arg->SC = S->get_scout_object();
     arg->ball = get_ballot_num();
     CreateThread(ScoutMode, (void*)arg, scout_thread);
-    
+
     char buf[kMaxDataSize];
     int num_bytes;
     int num_servers = S->get_num_servers();
@@ -163,7 +163,7 @@ void Leader::LeaderMode()
                 std::vector<string> token = split(string(msg), kInternalDelim[0]);
                 if (token[0] == kPropose)
                 {
-                    D(cout << "Leader receives PROPOSE" << "message" <<  endl;)
+                    D(cout << "SL" << S->get_pid() << ": Propose message received: " << buf <<  endl;)
                     if (S->proposals_.find(stoi(token[1])) == S->proposals_.end())
                     {
                         S->proposals_[stoi(token[1])] = stringToProposal(token[2]);
@@ -216,7 +216,7 @@ void Leader::LeaderMode()
                     }
                 }
                 else {    //other messages
-                    D(cout << "SL" << S->get_pid() << "ERROR: Unexpected message received: " << msg << endl;)
+                    D(cout << "SL" << S->get_pid() << ": ERROR: Unexpected message received: " << msg << endl;)
                 }
             }
         }

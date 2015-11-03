@@ -22,7 +22,7 @@ public:
     void Propose(const Proposal &p);
     void SendProposal(const int& s, const Proposal& p);
     void Perform(const int& slot, const Proposal& p);
-    void SendResponseToClient(const int& s, const Proposal& p);
+    void SendResponseToAllClients(const int& s, const Proposal& p);
     void IncrementSlotNum();
     void ReplicaMode();
     void Unicast(const string &type, const string& msg);

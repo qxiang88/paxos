@@ -160,6 +160,7 @@ void Master::ReadTest() {
                 return;
             if (!SpawnClients(num_clients_))
                 return;
+            usleep(kGeneralSleep);
         }
         if (keyword == kSendMessage) {
             int client_id;
@@ -402,7 +403,7 @@ int main() {
     Master M;
     M.ReadTest();
 
-    usleep(5000 * 1000);
+    usleep(8000 * 1000);
     M.KillAllServers();
     M.KillAllClients();
     return 0;

@@ -105,7 +105,7 @@ void Replica::CreateReceiveThreadsForClients() {
 
 void Replica::Unicast(const string &type, const string& msg)
 {
-    if (send(get_leader_fd(S->get_pid()), msg.c_str(), msg.size(), 0) == -1) {
+    if (send(get_leader_fd(S->get_primary_id()), msg.c_str(), msg.size(), 0) == -1) {
         D(cout << "SR" << S->get_pid() << ": ERROR in sending " << type << endl;)
     }
     else {
@@ -167,27 +167,29 @@ void Replica::Perform(const int& slot, const Proposal& p)
     }
 
     IncrementSlotNum();
-    SendResponseToClient(slot, p);
+    SendResponseToAllClients(slot, p);
 }
 
 /**
- * sends the decided proposal to client
+ * sends the decided proposal to all clients
  * @param s decided slot num
  * @param p proposal to be sent
  */
-void Replica::SendResponseToClient(const int& s, const Proposal& p)
+void Replica::SendResponseToAllClients(const int& s, const Proposal& p)
 {
     string msg = kResponse + kInternalDelim;
     msg += to_string(s) + kInternalDelim;
     msg += proposalToString(p) + kMessageDelim;
 
-    if (send(get_client_chat_fd(stoi(p.client_id)), msg.c_str(), msg.size(), 0) == -1) {
-        D(cout << "SR" << S->get_pid() << ": ERROR: sending response to client C"
-          << stoi(p.client_id) << endl;)
-    }
-    else {
-        D(cout << "SR" << S->get_pid() << ": Message sent to client C"
-          << stoi(p.client_id) << ": " << msg << endl;)
+    for (int i = 0; i < S->get_num_clients(); ++i) {
+        if (send(get_client_chat_fd(i), msg.c_str(), msg.size(), 0) == -1) {
+            D(cout << "SR" << S->get_pid() << ": ERROR: sending response to client C"
+              << i << endl;)
+        }
+        else {
+            D(cout << "SR" << S->get_pid() << ": Message sent to client C"
+              << i << ": " << msg << endl;)
+        }
     }
 }
 
@@ -220,7 +222,7 @@ void Replica::ReplicaMode()
 
         int rv = select(fd_max + 1, &fromset, NULL, NULL, NULL);
         if (rv == -1) { //error in select
-            D(cout << "SR" << S->get_pid() << ": error in select()" << endl;)
+            D(cout << "SR" << S->get_pid() << ": ERROR in select()" << endl;)
         } else if (rv == 0) {
             D(cout << "SR" << S->get_pid() << ": ERROR Unexpected select timeout" << endl;)
         } else {
@@ -300,18 +302,19 @@ void* ReceiveMessagesFromClient(void* _rcv_thread_arg) {
         } else {
             buf[num_bytes] = '\0';
             D(cout << "SR" << R->S->get_pid() << ": Message received from C"
-              << client_id << " - " << buf << endl;)
+              << client_id << ": " << buf << endl;)
 
             // extract multiple messages from the received buf
             std::vector<string> message = split(string(buf), kMessageDelim[0]);
             for (const auto &msg : message) {
-                std::vector<string> token = split(string(msg), kInternalDelim[0]);
-                // token[0] is the CHAT tag
-                // token[1] is client id
-                // token[2] is chat_id
-                // token[3] is the chat message
-                if (token[0] == kChat) {
-                    Proposal p(token[1], token[2], token[3]);
+                std::vector<string> tag = split(string(msg), kInternalDelim[0]);
+                // tag[0] is the CHAT tag
+                if (tag[0] == kChat) {
+                    std::vector<string> token = split(tag[1], kInternalStructDelim[0]);
+                    // token[0] is client id
+                    // token[1] is chat_id
+                    // token[2] is the chat message
+                    Proposal p(token[0], token[1], token[2]);
                     R->Propose(p);
                 } else {
                     D(cout << "S" << R->S->get_pid()

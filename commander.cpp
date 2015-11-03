@@ -167,6 +167,19 @@ void Commander::GetAcceptorFdSet(fd_set& acceptor_set, int& fd_max)
     }
 }
 
+/**
+ * close all connections with acceptors before exiting
+ */
+void Commander::CloseAllConnections() {
+    int acceptor_fd;
+    for (int i = 0; i < S->get_num_servers(); ++i) {
+        acceptor_fd = get_acceptor_fd(i);
+        if (acceptor_fd != -1) {
+            close(acceptor_fd);
+        }
+    }
+}
+
 void* CommanderMode(void* _rcv_thread_arg) {
     CommanderThreadArgument *rcv_thread_arg = (CommanderThreadArgument *)_rcv_thread_arg;
     Commander *C = rcv_thread_arg->C;
@@ -188,25 +201,25 @@ void* CommanderMode(void* _rcv_thread_arg) {
         int rv = select(fd_max + 1, &acceptor_set, NULL, NULL, NULL);
 
         if (rv == -1) { //error in select
-            D(cout << "SC" << C->S->get_pid() << "ERROR in select()" << endl;)
+            D(cout << "SC" << C->S->get_pid() << ": ERROR in select()" << endl;)
         } else if (rv == 0) {
-            D(cout << "SC" << C->S->get_pid() << "ERROR: Unexpected timeout in select()" << endl;)
+            D(cout << "SC" << C->S->get_pid() << ": ERROR: Unexpected timeout in select()" << endl;)
         } else {
             for (int i = 0; i < num_servers; i++) {
                 if (FD_ISSET(C->get_acceptor_fd(i), &acceptor_set)) { // we got one!!
                     char buf[kMaxDataSize];
                     if ((num_bytes = recv(C->get_acceptor_fd(i), buf, kMaxDataSize - 1, 0)) == -1) {
-                        D(cout << "SC" << C->S->get_pid() << "ERROR in receiving p2b from acceptor S" << i << endl;)
+                        D(cout << "SC" << C->S->get_pid() << ": ERROR in receiving p2b from acceptor S" << i << endl;)
                         // pthread_exit(NULL); //TODO: think about whether it should be exit or not
                     } else if (num_bytes == 0) {     //connection closed
-                        D(cout << "SC" << C->S->get_pid() << "Connection closed by acceptor S" << i << endl;)
+                        D(cout << "SC" << C->S->get_pid() << ": Connection closed by acceptor S" << i << endl;)
                     } else {
                         buf[num_bytes] = '\0';
                         std::vector<string> message = split(string(buf), kMessageDelim[0]);
                         for (const auto &msg : message) {
                             std::vector<string> token = split(string(msg), kInternalDelim[0]);
                             if (token[0] == kP2b) {
-                                D(cout << "SC" << C->S->get_pid() << "P2b message received from acceptor S" << i <<  endl;)
+                                D(cout << "SC" << C->S->get_pid() << ": P2b message received from acceptor S" << i <<  endl;)
 
                                 Ballot recvd_ballot = stringToBallot(token[2]);
                                 if (recvd_ballot == toSend->b)
@@ -215,14 +228,16 @@ void* CommanderMode(void* _rcv_thread_arg) {
                                     if (waitfor < (num_servers / 2))
                                     {
                                         C->SendDecision(*toSend);
+                                        C->CloseAllConnections();
                                         return NULL;
                                     }
                                 } else {
                                     C->SendPreEmpted(recvd_ballot);
+                                    C->CloseAllConnections();
                                     return NULL;
                                 }
                             } else {    //other messages
-                                D(cout << "SC" << C->S->get_pid() << "Unexpected message received: " << msg << endl;)
+                                D(cout << "SC" << C->S->get_pid() << ": Unexpected message received: " << msg << endl;)
                             }
                         }
                     }
