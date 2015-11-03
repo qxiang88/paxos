@@ -184,16 +184,17 @@ void Acceptor::AcceptorMode()
         }
 
         if (fds.empty()) {
-            usleep(kSelectSleep);
+            usleep(kBusyWaitSleep);
             continue;
         }
 
-        int rv = select(fd_max + 1, &recv_from, NULL, NULL, NULL);
+        struct timeval timeout = kSelectTimeoutTimeval;
+        int rv = select(fd_max + 1, &recv_from, NULL, NULL, &timeout);
 
         if (rv == -1) { //error in select
             D(cout << "SA" << S->get_pid() << ": ERROR in select() for Acceptor" << endl;)
         } else if (rv == 0) {
-            D(cout << "SA" << S->get_pid() << ": Unexpected select timeout in Acceptor" << endl;)
+            // D(cout << "SA" << S->get_pid() << ": Unexpected select timeout in Acceptor" << endl;)
         } else {
             for (int i = 0; i < fds.size(); i++) {
                 if (FD_ISSET(fds[i], &recv_from)) { // we got one!!

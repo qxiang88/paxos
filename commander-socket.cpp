@@ -127,12 +127,11 @@ void* AcceptConnectionsCommander(void* _C) {
  * @return  true if connection was successfull or already connected
  */
 bool Commander::ConnectToAcceptor(const int server_id) {
-    int sockfd;
-    int numbytes;
+    cout<<"server_id"<<server_id<<endl;
+    int sockfd, numbytes;
     struct addrinfo hints, *servinfo, *l;
     char s[INET6_ADDRSTRLEN];
     int rv;
-
     // set up addrinfo for server
 
     memset(&hints, 0, sizeof hints);
@@ -147,15 +146,22 @@ bool Commander::ConnectToAcceptor(const int server_id) {
     // loop through all the results and connect to the first we can
     for (l = servinfo; l != NULL; l = l->ai_next)
     {
+        if ((sockfd = socket(l->ai_family, l->ai_socktype,
+                             l->ai_protocol)) == -1) {
+            perror("client: socket");
+            continue;
+        }
+
         errno = 0;
         if (connect(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
+            // cout << "errno" << errno << endl;
             close(sockfd);
-            // if (errno == EBADF) cout << errno << endl;
             continue;
         }
 
         break;
     }
+
     if (l == NULL) {
         return false;
     }

@@ -402,7 +402,7 @@ void Master::SendMessageToClient(const int client_id, const string &message) {
 int main() {
     Master M;
     M.ReadTest();
-
+    
     usleep(8000 * 1000);
     M.KillAllServers();
     M.KillAllClients();

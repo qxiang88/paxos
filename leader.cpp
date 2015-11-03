@@ -95,7 +95,7 @@ void Leader::GetFdSet(fd_set& recv_from_set, int& fd_max, vector<int>& fds)
     int fd_temp;
     FD_ZERO(&recv_from_set);
     fds.clear();
-    
+
     fd_temp = get_replica_fd(S->get_pid());
     FD_SET(fd_temp, &recv_from_set);
     fd_max = max(fd_max, fd_temp);
@@ -168,7 +168,7 @@ void Leader::LeaderMode()
     arg->ball = get_ballot_num();
     CreateThread(ScoutMode, (void*)arg, scout_thread);
 
-    
+
     int num_servers = S->get_num_servers();
 
     while (true) {
@@ -178,13 +178,13 @@ void Leader::LeaderMode()
         GetFdSet(recv_from_set, fd_max, fds);
 
         int rv = select(fd_max + 1, &recv_from_set, NULL, NULL, NULL);
-        
+
         if (rv == -1) { //error in select
             D(cout << "SL" << S->get_pid() << ": ERROR in select()" << endl;)
         } else if (rv == 0) {
             D(cout << "SL" << S->get_pid() << ": ERROR Unexpected select timeout" << endl;)
         } else {
-            for(int i=0;i<fds.size();i++)
+            for (int i = 0; i < fds.size(); i++)
             {
                 if (FD_ISSET(fds[i], &recv_from_set)) { // we got one!!
                     char buf[kMaxDataSize];
@@ -212,9 +212,9 @@ void Leader::LeaderMode()
                                     {
                                         // commander
                                         pthread_t commander_thread;
-                                        Commander C(S);
+                                        Commander *C = new Commander(S);
                                         CommanderThreadArgument* arg = new CommanderThreadArgument;
-                                        arg->C = &C;
+                                        arg->C = C;
                                         Triple tempt = Triple(get_ballot_num(), stoi(token[1]), proposals_[stoi(token[1])]);
                                         arg->toSend = &tempt;
                                         CreateThread(CommanderMode, (void*)arg, commander_thread);
@@ -226,20 +226,20 @@ void Leader::LeaderMode()
                                 D(cout << "SL" << S->get_pid() << ": Adopted message received: " << msg <<  endl;)
 
                                 unordered_set<Triple> pvalues;
-                                if(token.size()==3)
-                                    {
-                                        pvalues = stringToTripleSet(token[2]);
-                                        proposals_ = pairxor(proposals_, pmax(pvalues));
-                                    }
+                                if (token.size() == 3)
+                                {
+                                    pvalues = stringToTripleSet(token[2]);
+                                    proposals_ = pairxor(proposals_, pmax(pvalues));
+                                }
 
                                 pthread_t commander_thread[proposals_.size()];
                                 int i = 0;
                                 for (auto it = proposals_.begin(); it != proposals_.end(); it++)
                                 {
                                     // commander
-                                    Commander C(S);
+                                    Commander *C = new Commander(S);
                                     CommanderThreadArgument* arg = new CommanderThreadArgument;
-                                    arg->C = &C;
+                                    arg->C = C;
                                     Triple tempt = Triple(get_ballot_num(), stoi(token[1]), proposals_[stoi(token[1])]);
                                     arg->toSend = &tempt;
                                     CreateThread(CommanderMode, (void*)arg, commander_thread[i]);
@@ -275,5 +275,5 @@ void Leader::LeaderMode()
         }
     }
 
-    D(cout<<"Leader exiting"<<endl;)
+    D(cout << "Leader exiting" << endl;)
 }

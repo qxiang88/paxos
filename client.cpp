@@ -289,12 +289,12 @@ void* ReceiveMessagesFromPrimary(void* _C) {
         if (num_bytes == -1) {
             // D(cout << "C" << C->get_pid() <<
             // " : ERROR in receiving message from primary S" << primary_id << endl;)
-            usleep(kSelectSleep);
+            usleep(kBusyWaitSleep);
         } else if (num_bytes == 0) {    // connection closed by primary
             // D(cout << "C" << C->get_pid() << " : Connection closed by primary S" << primary_id << endl;)
             //TODO: Need to take some action like increment primary_id?
             //or wait for update command from master?
-            usleep(kSelectSleep);
+            usleep(kBusyWaitSleep);
         } else {
             buf[num_bytes] = '\0';
 
@@ -303,11 +303,21 @@ void* ReceiveMessagesFromPrimary(void* _C) {
             for (const auto &msg : message) {
                 std::vector<string> token = split(string(msg), kInternalDelim[0]);
                 // token[0] = kresponse
-                // token[1] = sequence number of chat as assigned by Paxos
-                // token[2] = (client id) id of original sender of chat message
-                // token[3] = (chat id)
-                // token[4] = (msg) chat message body
-                C->AddToFinalChatLog(token[1], token[2], token[4]);
+                if (token[0] == kResponse) {
+                    D(cout << "C" << C->get_pid()
+                      << " : Decision received from primary S" << primary_id << ": " << msg << endl;)
+                    // token[1] = sequence number of chat as assigned by Paxos
+                    // token[2] = proposal
+                    std::vector<string> proposal_token =
+                        split(string(token[2]), kInternalStructDelim[0]);
+                    // proposal_token[0] = (client id) id of original sender of chat message
+                    // proposal_token[1] = (chat id) wrt to original sender of chat message
+                    // proposal_token[2] = (msg) chat message body
+                    C->AddToFinalChatLog(token[1], proposal_token[1], proposal_token[2]);
+                } else {
+                    D(cout << "C" << C->get_pid() << " : Unexpected message received: " << msg << endl;)
+
+                }
             }
         }
     }

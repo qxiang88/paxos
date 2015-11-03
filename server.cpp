@@ -274,8 +274,9 @@ int main(int argc, char *argv[]) {
     CreateThread(AcceptConnectionsServer, (void*)&S, accept_connections_thread);
 
     if (S.get_pid() == S.get_primary_id()) {
-        Commander C(&S, S.get_num_servers());
-        S.CommanderAcceptThread(&C);
+        Commander *C = new Commander(&S, S.get_num_servers());
+        // Commander C();
+        S.CommanderAcceptThread(C);
 
         S.set_scout_object();
         S.ScoutAcceptThread(S.get_scout_object());

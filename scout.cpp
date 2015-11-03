@@ -62,19 +62,13 @@ void Scout::set_acceptor_fd(const int server_id, const int fd) {
 
 void Scout::SendToServers(const string& type, const string& msg)
 {
-    int serv_fd;
     for (int i = 0; i < S->get_num_servers(); i++)
     {
-        if (type == kDecision)
-            serv_fd = get_replica_fd(i);
-        else if (type == kP1a) //p2a sent in commander
-            serv_fd = get_acceptor_fd(i);
-
-        if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
-            D(cout << "SS" << S->get_pid() << ": ERROR: sending to replica or acceptor S" << (i) << endl;)
+        if (send(get_acceptor_fd(i), msg.c_str(), msg.size(), 0) == -1) {
+            D(cout << "SS" << S->get_pid() << ": ERROR: sending to acceptor S" << (i) << endl;)
         }
         else {
-            D(cout << "SS" << S->get_pid() << ": Message sent to replica or acceptor S" << i << ": " << msg << endl;)
+            D(cout << "SS" << S->get_pid() << ": Message sent to acceptor S" << i << ": " << msg << endl;)
         }
     }
 }

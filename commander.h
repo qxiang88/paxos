@@ -18,7 +18,7 @@ class Server;
 class Commander {
 public:
     bool ConnectToAcceptor(const int server_id);
-    void SendP2a(const Triple & t, vector<int> acceptor_peer_fd);
+    void SendP2a(const Triple & t, const vector<int> &acceptor_peer_fd);
     void SendDecision(const Triple & t);
     void SendPreEmpted(const Ballot& b);
     void SendToServers(const string& type, const string& msg);

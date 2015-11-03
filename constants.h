@@ -44,10 +44,15 @@ const string kResponse = "RESPONSE";
 
 // sleep values
 const time_t kGeneralSleep = 1000 * 1000;
-const time_t kSelectSleep = 500 * 1000;
+const time_t kBusyWaitSleep = 500 * 1000;
 
 // timeout values
 const timeval kReceiveTimeoutTimeval = {
+    0, // tv_sec
+    500 * 1000 //tv_usec (microsec)
+};
+
+const timeval kSelectTimeoutTimeval = {
     0, // tv_sec
     500 * 1000 //tv_usec (microsec)
 };

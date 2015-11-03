@@ -85,24 +85,6 @@ void Replica::IncrementSlotNum() {
     set_slot_num(get_slot_num() + 1);
 }
 
-/**
- * creates threads for receiving messages from clients
- */
-void Replica::CreateReceiveThreadsForClients() {
-    int num_clients = S->get_num_clients();
-    std::vector<pthread_t> receive_from_client_thread(num_clients);
-
-    ReceiveThreadArgument **rcv_thread_arg = new ReceiveThreadArgument*[num_clients];
-    for (int i = 0; i < num_clients; i++) {
-        rcv_thread_arg[i] = new ReceiveThreadArgument;
-        rcv_thread_arg[i]->R = this;
-        rcv_thread_arg[i]->client_id = i;
-        CreateThread(ReceiveMessagesFromClient,
-                     (void *)rcv_thread_arg[i],
-                     receive_from_client_thread[i]);
-    }
-}
-
 void Replica::Unicast(const string &type, const string& msg)
 {
     if (send(get_leader_fd(S->get_primary_id()), msg.c_str(), msg.size(), 0) == -1) {
@@ -220,6 +202,18 @@ void Replica::ReplicaMode()
             fds.push_back(fd_temp);
             FD_SET(fd_temp, &fromset);
         }
+
+        for (int i = 0; i < S->get_num_servers(); i++)
+        {
+            fd_temp = get_commander_fd(i);
+            if(fd_temp == -1)
+                continue;
+
+            fd_max = max(fd_max, fd_temp);
+            fds.push_back(fd_temp);
+            FD_SET(fd_temp, &fromset);
+        }
+
         //TODO: Use local primary_id from calling function or get_primary_id()?
         fd_temp = get_leader_fd(S->get_primary_id());
         fd_max = max(fd_max, fd_temp);
@@ -237,9 +231,9 @@ void Replica::ReplicaMode()
                     char buf[kMaxDataSize];
                     if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1) {
                         D(cout << "SR" << S->get_pid()
-                          << ": ERROR in receiving from leader or clients" << endl;)
+                          << ": ERROR in receiving from commander or clients" << endl;)
                     } else if (num_bytes == 0) {     //connection closed
-                        D(cout << "SR" << S->get_pid() << ": Connection closed by leader or client" << endl;)
+                        D(cout << "SR" << S->get_pid() << ": Connection closed by commander or client" << endl;)
                     } else {
                         buf[num_bytes] = '\0';
                         std::vector<string> message = split(string(buf), kMessageDelim[0]);
@@ -253,7 +247,7 @@ void Replica::ReplicaMode()
                             }
                             else if (token[0] == kDecision)
                             {
-                                D(cout << "SR" << S->get_pid() << ": Received decision: " << buf <<  endl;)
+                                D(cout << "SR" << S->get_pid() << ": Received decision from commander: " << buf <<  endl;)
                                 int s = stoi(token[1]);
                                 Proposal p = stringToProposal(token[2]);
                                 decisions_[s] = p;
@@ -282,55 +276,6 @@ void Replica::ReplicaMode()
             }
         }
     }
-}
-
-/**
- * function for the thread receiving messages from a client with id=client_id
- * @param _rcv_thread_arg argument containing server object and client_id
- */
-void* ReceiveMessagesFromClient(void* _rcv_thread_arg) {
-    ReceiveThreadArgument *rcv_thread_arg = (ReceiveThreadArgument *)_rcv_thread_arg;
-    Replica *R = rcv_thread_arg->R;
-    int client_id = rcv_thread_arg->client_id;
-
-    char buf[kMaxDataSize];
-    int num_bytes;
-
-    while (true) {  // always listen to messages from the client
-        num_bytes = recv(R->get_client_chat_fd(client_id), buf, kMaxDataSize - 1, 0);
-        if (num_bytes == -1) {
-            D(cout << "SR" << R->S->get_pid() << ": ERROR in receiving message from C"
-              << client_id << endl;)
-            return NULL;
-        } else if (num_bytes == 0) {    // connection closed by client
-            D(cout << "SR" << R->S->get_pid() << ": ERROR: Connection closed by Client." << endl;)
-            return NULL;
-        } else {
-            buf[num_bytes] = '\0';
-            D(cout << "SR" << R->S->get_pid() << ": Message received from C"
-              << client_id << ": " << buf << endl;)
-
-            // extract multiple messages from the received buf
-            std::vector<string> message = split(string(buf), kMessageDelim[0]);
-            for (const auto &msg : message) {
-                std::vector<string> tag = split(string(msg), kInternalDelim[0]);
-                // tag[0] is the CHAT tag
-                if (tag[0] == kChat) {
-                    std::vector<string> token = split(tag[1], kInternalStructDelim[0]);
-                    // token[0] is client id
-                    // token[1] is chat_id
-                    // token[2] is the chat message
-                    Proposal p(token[0], token[1], token[2]);
-                    R->Propose(p);
-                } else {
-                    D(cout << "S" << R->S->get_pid()
-                      << ": ERROR Unexpected message received from C" << client_id
-                      << " - " << buf << endl;)
-                }
-            }
-        }
-    }
-    return NULL;
 }
 
 /**
@@ -370,9 +315,6 @@ void* ReplicaEntry(void *_S) {
     usleep(kGeneralSleep);
     usleep(kGeneralSleep);
     usleep(kGeneralSleep);
-    // if (R.S->get_pid() == primary_id) {
-    //     R.CreateReceiveThreadsForClients();
-    // }
 
     R.ReplicaMode();
 

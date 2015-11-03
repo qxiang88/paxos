@@ -11,14 +11,12 @@
 using namespace std;
 
 void* AcceptConnectionsReplica(void* _R);
-void* ReceiveMessagesFromClient(void* _rcv_thread_arg);
 void* ReplicaEntry(void *_S);
 
 class Replica {
 public:
     bool ConnectToCommander(const int server_id);
     bool ConnectToScout(const int server_id);
-    void CreateReceiveThreadsForClients();
     void Propose(const Proposal &p);
     void SendProposal(const int& s, const Proposal& p);
     void Perform(const int& slot, const Proposal& p);
