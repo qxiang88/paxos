@@ -204,9 +204,9 @@ void Master::ReceiveChatLogFromClient(const int client_id, string &chat_log) {
     int num_bytes;
     num_bytes = recv(get_client_fd(client_id), buf, kMaxDataSize - 1, 0);
     if (num_bytes == -1) {
-        D(cout << "M: ERROR in receiving ChatLog from client C" << client_id << endl;)
+        D(cout << "M  : ERROR in receiving ChatLog from client C" << client_id << endl;)
     } else if (num_bytes == 0) {    // connection closed by master
-        D(cout << "M: Connection closed by client C" << client_id << endl;)
+        D(cout << "M  : Connection closed by client C" << client_id << endl;)
     } else {
         buf[num_bytes] = '\0';
         chat_log = string(buf);
@@ -266,10 +266,10 @@ bool Master::SpawnServers(const int n) {
                              argv,
                              environ);
         if (status == 0) {
-            D(cout << "M: Spawed server S" << i << endl;)
+            D(cout << "M  : Spawed server S" << i << endl;)
             set_server_pid(i, pid);
         } else {
-            D(cout << "M: ERROR: Cannot spawn server S"
+            D(cout << "M  : ERROR: Cannot spawn server S"
                     << i << " - " << strerror(status) << endl);
             return false;
         }
@@ -279,9 +279,9 @@ bool Master::SpawnServers(const int n) {
     usleep(kGeneralSleep);
     for (int i = 0; i < n; ++i) {
         if (ConnectToServer(i)) {
-            D(cout << "M: Connected to server S" << i << endl;)
+            D(cout << "M  : Connected to server S" << i << endl;)
         } else {
-            D(cout << "M: ERROR: Cannot connect to server S" << i << endl;)
+            D(cout << "M  : ERROR: Cannot connect to server S" << i << endl;)
             return false;
         }
     }
@@ -316,10 +316,10 @@ bool Master::SpawnClients(const int n) {
                              argv,
                              environ);
         if (status == 0) {
-            D(cout << "M: Spawed client C" << i << endl;)
+            D(cout << "M  : Spawed client C" << i << endl;)
             set_client_pid(i, pid);
         } else {
-            D(cout << "M: ERROR: Cannot spawn client C" << i << " - " << strerror(status) << endl;)
+            D(cout << "M  : ERROR: Cannot spawn client C" << i << " - " << strerror(status) << endl;)
             return false;
         }
     }
@@ -328,9 +328,9 @@ bool Master::SpawnClients(const int n) {
     usleep(kGeneralSleep);
     for (int i = 0; i < n; ++i) {
         if (ConnectToClient(i)) {
-            D(cout << "M: Connected to client C" << i << endl;)
+            D(cout << "M  : Connected to client C" << i << endl;)
         } else {
-            D(cout << "M: ERROR: Cannot connect to client C" << i << endl;)
+            D(cout << "M  : ERROR: Cannot connect to client C" << i << endl;)
             return false;
         }
     }
@@ -392,9 +392,9 @@ void Master::KillAllClients() {
  */
 void Master::SendMessageToClient(const int client_id, const string &message) {
     if (send(get_client_fd(client_id), message.c_str(), message.size(), 0) == -1) {
-        D(cout << "M: ERROR: Cannot send message to client C" << client_id << endl;)
+        D(cout << "M  : ERROR: Cannot send message to client C" << client_id << endl;)
     } else {
-        D(cout << "M: Message sent to client C" << client_id << ": " << message << endl;)
+        D(cout << "M  : Message sent to client C" << client_id << ": " << message << endl;)
     }
 }
 
@@ -402,7 +402,7 @@ int main() {
     Master M;
     M.ReadTest();
 
-    usleep(10000 * 1000);
+    usleep(5000 * 1000);
     M.KillAllServers();
     M.KillAllClients();
     return 0;

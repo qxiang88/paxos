@@ -74,7 +74,7 @@ void Scout::SendToServers(const string& type, const string& msg)
             D(cout << "SS" << S->get_pid() << ": ERROR: sending to replica or acceptor S" << (i) << endl;)
         }
         else {
-            D(cout << "SS" << S->get_pid() << ": Message sent to S" << i << ": " << msg << endl;)
+            D(cout << "SS" << S->get_pid() << ": Message sent to replica or acceptor S" << i << ": " << msg << endl;)
         }
     }
 }
@@ -94,6 +94,16 @@ void Scout::GetAcceptorFdSet(fd_set& acceptor_set, int& fd_max)
     }
 }
 
+void Scout::Unicast(const string &type, const string& msg)
+{
+    if (send(get_leader_fd(S->get_pid()), msg.c_str(), msg.size(), 0) == -1) {
+        D(cout << "SS" << S->get_pid() << ": ERROR in sending " << type << endl;)
+    }
+    else {
+        D(cout << "SS" << S->get_pid() << ": " << type << " message sent: " << msg << endl;)
+    }
+}
+
 void Scout::SendP1a(const Ballot &b)
 {
     string msg = kP1a + kInternalDelim + to_string(S->get_pid());
@@ -104,13 +114,13 @@ void Scout::SendP1a(const Ballot &b)
 void Scout::SendAdopted(const Ballot& recvd_ballot, unordered_set<Triple> pvalues) {
     string msg = kAdopted + kInternalDelim + ballotToString(recvd_ballot) + kInternalDelim;
     msg += tripleSetToString(pvalues) + kMessageDelim;
-    S->Unicast(kAdopted, msg);
+    Unicast(kAdopted, msg);
 }
 
 void Scout::SendPreEmpted(const Ballot& b)
 {
     string msg = kPreEmpted + kInternalDelim + ballotToString(b) + kMessageDelim;
-    S->Unicast(kPreEmpted, msg);
+    Unicast(kPreEmpted, msg);
 }
 
 void* ScoutMode(void* _rcv_thread_arg) {

@@ -117,8 +117,8 @@ void* AcceptConnectionsCommander(void* _C) {
                   << incoming_port << endl;)
             }
         }
-        pthread_exit(NULL);
     }
+    pthread_exit(NULL);
 }
 
 /**

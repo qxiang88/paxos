@@ -27,13 +27,9 @@ extern void* AcceptConnectionsServer(void* _S);
 extern void* AcceptConnectionsCommander(void* _C);
 extern void* AcceptConnectionsScout(void* _SC);
 
-// commander class static member initialization
-// Commander::leader_fd_ = std::vector<int> (num_servers_, -1);
-// Commander::replica_fd_ = std::vector<int> (num_servers_, -1);
-
-void *ReplicaEntry(void *_S);
-void *AcceptorEntry(void *_S);
-void *LeaderEntry(void *_S);
+extern void *ReplicaEntry(void *_S);
+extern void *AcceptorEntry(void *_S);
+extern void *LeaderEntry(void *_S);
 
 int Server::get_pid() {
     return pid_;
@@ -107,8 +103,8 @@ void Server::set_primary_id(const int primary_id) {
     primary_id_ = primary_id;
 }
 
-void Server::set_scout_object(Scout* sc) {
-    scout_object_ = sc;
+void Server::set_scout_object() {
+    scout_object_ = new Scout(this);
 }
 
 /**
@@ -249,8 +245,6 @@ void Server::Initialize(const int pid,
     acceptor_port_.resize(num_servers_);
     replica_port_.resize(num_servers_);
     leader_port_.resize(num_servers_);
-
-    set_scout_object(NULL);
 }
 
 /**
@@ -269,33 +263,6 @@ void Server::ScoutAcceptThread(Scout* SC) {
     CreateThread(AcceptConnectionsScout, (void*)SC, accept_connections_thread);
 }
 
-void Server::Unicast(const string &type, const string& msg, int r_fd)
-{
-    // int serv_fd;
-    // if (r_fd == -1)
-    // {
-    //     if (type == kPreEmpted || type == kAdopted || type == kPropose)
-    //         serv_fd = get_leader_fd(get_pid());
-    //     else if (type == kP2b)
-    //         serv_fd = get_commander_fd(get_pid());
-    //     else if (type == kP1b)
-    //         serv_fd = get_scout_fd(get_pid());
-    // }
-    // else
-    // {
-    //     //as of now only used for commander to acceptor messages
-    //     D(cout << "using non default port for unicast" << endl;)
-    //     serv_fd = r_fd;
-    // }
-
-    // if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
-    //     D(cout << ": ERROR: sending " << type << endl;)
-    // }
-    // else {
-    //     D(cout << ": " << type << "Msg sent" << endl;)
-    // }
-}
-
 int main(int argc, char *argv[]) {
     Server S;
     S.Initialize(atoi(argv[1]), atoi(argv[2]), atoi(argv[3]));
@@ -309,9 +276,8 @@ int main(int argc, char *argv[]) {
     if (S.get_pid() == S.get_primary_id()) {
         Commander C(&S, S.get_num_servers());
         S.CommanderAcceptThread(&C);
-        
-        Scout SC(&S);
-        S.set_scout_object(&SC);
+
+        S.set_scout_object();
         S.ScoutAcceptThread(S.get_scout_object());
     }
 
@@ -321,12 +287,15 @@ int main(int argc, char *argv[]) {
     pthread_t acceptor_thread;
     CreateThread(AcceptorEntry, (void*)&S, acceptor_thread);
 
+    pthread_t leader_thread;
     if (S.get_pid() == S.get_primary_id()) {
-        pthread_t leader_thread;
         CreateThread(LeaderEntry, (void*)&S, leader_thread);
     }
 
     void *status;
     pthread_join(accept_connections_thread, &status);
+    pthread_join(replica_thread, &status);
+    pthread_join(acceptor_thread, &status);
+    pthread_join(leader_thread, &status);
     return 0;
 }

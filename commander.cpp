@@ -63,6 +63,16 @@ void Commander::set_acceptor_fd(const int server_id, const int fd) {
     acceptor_fd_[server_id] = fd;
 }
 
+void Commander::Unicast(const string &type, const string& msg)
+{
+    if (send(get_leader_fd(S->get_pid()), msg.c_str(), msg.size(), 0) == -1) {
+        D(cout << "SC" << S->get_pid() << ": ERROR in sending " << type << endl;)
+    }
+    else {
+        D(cout << "SC" << S->get_pid() << ": " << type << " message sent: " << msg << endl;)
+    }
+}
+
 void Commander::SendToServers(const string& type, const string& msg)
 {
     int serv_fd;
@@ -110,7 +120,7 @@ void Commander::SendDecision(const Triple & t)
 void Commander::SendPreEmpted(const Ballot& b)
 {
     string msg = kPreEmpted + kInternalDelim + ballotToString(b) + kMessageDelim;
-    S->Unicast(kPreEmpted, msg);
+    Unicast(kPreEmpted, msg);
 }
 
 void Commander::ConnectToAllAcceptors(std::vector<int> &acceptor_peer_fd) {

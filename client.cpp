@@ -146,12 +146,12 @@ void Client::SendChatToPrimary(const int chat_id, const string &chat_message) {
                  chat_message + kMessageDelim;
     int primary_id = get_primary_id();
     if (send(get_primary_fd(), msg.c_str(), msg.size(), 0) == -1) {
-        D(cout << "C" << get_pid() << ": ERROR: Cannot send chat message to primary S"
+        D(cout << "C" << get_pid() << " : ERROR: Cannot send chat message to primary S"
           << primary_id << endl;)
         //TODO: Need to take some action like increment primary_id?
         //or wait for update command from master?
     } else {
-        D(cout << "C" << get_pid() << ": Chat message sent to primary S"
+        D(cout << "C" << get_pid() << " : Chat message sent to primary S"
           << primary_id << ": " << msg << endl;)
     }
 }
@@ -218,9 +218,9 @@ void Client::SendChatLogToMaster() {
 
     if (send(get_master_fd(), chat_log_message.c_str(),
              chat_log_message.size(), 0) == -1) {
-        D(cout << "C" << get_pid() << ": ERROR: Cannot send ChatLog M" << endl;)
+        D(cout << "C" << get_pid() << " : ERROR: Cannot send ChatLog M" << endl;)
     } else {
-        D(cout << "C" << get_pid() << ": ChatLog sent to M" << endl;)
+        D(cout << "C" << get_pid() << " : ChatLog sent to M" << endl;)
     }
 }
 
@@ -229,7 +229,7 @@ void Client::SendChatLogToMaster() {
  */
 void Client::InitializeLocks() {
     if (pthread_mutex_init(&final_chat_log_lock, NULL) != 0) {
-        D(cout << "C" << get_pid() << ": Mutex init failed" << endl;)
+        D(cout << "C" << get_pid() << " : Mutex init failed" << endl;)
         pthread_exit(NULL);
     }
 }
@@ -246,10 +246,10 @@ void* ReceiveMessagesFromMaster(void* _C) {
     while (true) {  // always listen to messages from the master
         num_bytes = recv(C->get_master_fd(), buf, kMaxDataSize - 1, 0);
         if (num_bytes == -1) {
-            D(cout << "C" << C->get_pid() << ": ERROR in receiving message from M" << endl;)
+            D(cout << "C" << C->get_pid() << " : ERROR in receiving message from M" << endl;)
             return NULL;
         } else if (num_bytes == 0) {    // connection closed by master
-            D(cout << "C" << C->get_pid() << ": Connection closed by Master. Exiting." << endl;)
+            D(cout << "C" << C->get_pid() << " : Connection closed by Master. Exiting." << endl;)
             return NULL;
         } else {
             buf[num_bytes] = '\0';
@@ -259,11 +259,11 @@ void* ReceiveMessagesFromMaster(void* _C) {
             for (const auto &msg : message) {
                 std::vector<string> token = split(string(msg), kInternalDelim[0]);
                 if (token[0] == kChat) {   // new chat message received from master
-                    D(cout << "C" << C->get_pid() << ": Chat message received from M: " << token[1] <<  endl;)
+                    D(cout << "C" << C->get_pid() << " : Chat message received from M: " << token[1] <<  endl;)
                     C->AddChatToChatList(token[1]);
                     C->SendChatToPrimary(C->ChatListSize() - 1, token[1]);
                 } else if (token[0] == kChatLog) {  // chat log request from master
-                    D(cout << "C" << C->get_pid() << ": ChatLog request received from M: " <<  endl;)
+                    D(cout << "C" << C->get_pid() << " : ChatLog request received from M: " <<  endl;)
                     C->SendChatLogToMaster();
                 } else {    //other messages
 
@@ -294,9 +294,9 @@ void* ReceiveMessagesFromPrimary(void* _C) {
         num_bytes = recv(primary_fd, buf, kMaxDataSize - 1, 0);
         if (num_bytes == -1) {
             // D(cout << "C" << C->get_pid() <<
-            // ": ERROR in receiving message from primary S" << primary_id << endl;)
+            // " : ERROR in receiving message from primary S" << primary_id << endl;)
         } else if (num_bytes == 0) {    // connection closed by primary
-            // D(cout << "C" << C->get_pid() << ": Connection closed by primary S" << primary_id << endl;)
+            // D(cout << "C" << C->get_pid() << " : Connection closed by primary S" << primary_id << endl;)
             //TODO: Need to take some action like increment primary_id?
             //or wait for update command from master?
         } else {
@@ -332,9 +332,9 @@ int main(int argc, char *argv[]) {
     pthread_join(accept_connections_thread, &status);
 
     if (C.ConnectToPrimary()) {
-        D(cout << "C" << C.get_pid() << ": Connected to primary S" << C.get_primary_id() << endl;)
+        D(cout << "C" << C.get_pid() << " : Connected to primary S" << C.get_primary_id() << endl;)
     } else {
-        D(cout << "C" << C.get_pid() << ": ERROR in connecting to primary S" << C.get_primary_id() << endl;)
+        D(cout << "C" << C.get_pid() << " : ERROR in connecting to primary S" << C.get_primary_id() << endl;)
         //TODO: Need to take some action like increment primary_id?
         //or wait for update command from master?
     }

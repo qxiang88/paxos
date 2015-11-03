@@ -25,6 +25,7 @@ public:
     void SendResponseToClient(const int& s, const Proposal& p);
     void IncrementSlotNum();
     void ReplicaMode();
+    void Unicast(const string &type, const string& msg);
 
     int get_slot_num();
     int get_commander_fd(const int server_id);

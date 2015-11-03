@@ -24,6 +24,7 @@ public:
     void SendToServers(const string& type, const string& msg);
     void ConnectToAllAcceptors(std::vector<int> &acceptor_peer_fd);
     void GetAcceptorFdSet(fd_set& acceptor_set, int& fd_max);
+    void Unicast(const string &type, const string& msg);
 
     int get_leader_fd(const int server_id);
     int get_replica_fd(const int server_id);

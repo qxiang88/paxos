@@ -211,6 +211,7 @@ bool Replica::ConnectToCommander(const int server_id) {
         break;
     }
     if (l == NULL) {
+        cout<<S->get_pid()<<"HH"<<endl;
         return false;
     }
     // int outgoing_port = ntohs(return_port_no((struct sockaddr *)l->ai_addr));

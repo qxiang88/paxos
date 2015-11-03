@@ -93,42 +93,43 @@ void Leader::IncrementBallotNum() {
  * @param  _S pointer to server class object
  * @return    NULL
  */
-void *LeaderEntry(void *_S) {
-    Leader R((Server*)_S);
+void* LeaderEntry(void *_S) {
+    Leader L((Server*)_S);
 
     // does not need accept threads since it does not listen to connections from anyone
 
     // sleep for some time to make sure accept threads of commanders,scouts,replica are running
     usleep(kGeneralSleep);
-    int primary_id = R.S->get_primary_id();
-    if (R.ConnectToCommander(primary_id)) {
-        D(cout << "SL" << R.S->get_pid() << ": Connected to commander of S"
+    usleep(kGeneralSleep);
+    int primary_id = L.S->get_primary_id();
+    if (L.ConnectToCommander(primary_id)) {
+        D(cout << "SL" << L.S->get_pid() << ": Connected to commander of S"
           << primary_id << endl;)
     } else {
-        D(cout << "SL" << R.S->get_pid() << ": ERROR in connecting to commander of S"
+        D(cout << "SL" << L.S->get_pid() << ": ERROR in connecting to commander of S"
           << primary_id << endl;)
         return NULL;
     }
 
-    if (R.ConnectToScout(primary_id)) {
-        D(cout << "SL" << R.S->get_pid() << ": Connected to scout of S"
+    if (L.ConnectToScout(primary_id)) {
+        D(cout << "SL" << L.S->get_pid() << ": Connected to scout of S"
           << primary_id << endl;)
     } else {
-        D(cout << "SL" << R.S->get_pid() << ": ERROR in connecting to scout of S"
+        D(cout << "SL" << L.S->get_pid() << ": ERROR in connecting to scout of S"
           << primary_id << endl;)
         return NULL;
     }
 
-    if (R.ConnectToReplica(primary_id)) { // same as R.S->get_pid()
-        D(cout << "SL" << R.S->get_pid() << ": Connected to replica of S"
+    if (L.ConnectToReplica(primary_id)) { // same as R.S->get_pid()
+        D(cout << "SL" << L.S->get_pid() << ": Connected to replica of S"
           << primary_id << endl;)
     } else {
-        D(cout << "SL" << R.S->get_pid() << ": ERROR in connecting to replica of S"
+        D(cout << "SL" << L.S->get_pid() << ": ERROR in connecting to replica of S"
           << primary_id << endl;)
         return NULL;
     }
 
-    R.LeaderMode();
+    L.LeaderMode();
     return NULL;
 }
 
@@ -137,9 +138,13 @@ void *LeaderEntry(void *_S) {
  */
 void Leader::LeaderMode()
 {
-    // pthread_t scout_thread;
-    // CreateThread(ScoutMode, (void*)this, scout_thread);
-
+    // scout
+    pthread_t scout_thread;
+    ScoutThreadArgument* arg = new ScoutThreadArgument;
+    arg->SC = S->get_scout_object();
+    arg->ball = get_ballot_num();
+    CreateThread(ScoutMode, (void*)arg, scout_thread);
+    
     char buf[kMaxDataSize];
     int num_bytes;
     int num_servers = S->get_num_servers();
@@ -165,7 +170,7 @@ void Leader::LeaderMode()
                         if (get_leader_active())
                         {
                             // scout
-                            pthread_t scout_thread;
+                            // pthread_t scout_thread;
                             ScoutThreadArgument* arg = new ScoutThreadArgument;
                             arg->SC = S->get_scout_object();
                             arg->ball = get_ballot_num();;
@@ -203,7 +208,7 @@ void Leader::LeaderMode()
                         IncrementBallotNum();
 
                         // scout
-                        pthread_t scout_thread;
+                        // pthread_t scout_thread;
                         ScoutThreadArgument* arg = new ScoutThreadArgument;
                         arg->SC = S->get_scout_object();
                         arg->ball = get_ballot_num();

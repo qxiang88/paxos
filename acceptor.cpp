@@ -113,31 +113,20 @@ void Acceptor::SendBackOwnFD(const int fd) {
     }
 }
 
-/**
- * thread entry function for acceptor
- * @param  _S pointer to server class object
- * @return    NULL
- */
-void *AcceptorEntry(void *_S) {
-    Acceptor A((Server*)_S);
+void Acceptor::Unicast(const string &type, const string& msg, int r_fd)
+{
+    int serv_fd;
+    if (r_fd == -1)
+        serv_fd = get_scout_fd(S->get_primary_id());
+    else
+        serv_fd = r_fd;
 
-    pthread_t accept_connections_thread;
-    CreateThread(AcceptConnectionsAcceptor, (void*)&A, accept_connections_thread);
-
-    int primary_id = A.S->get_primary_id();
-
-    // sleep for some time to make sure accept threads of scouts are running
-    usleep(kGeneralSleep);
-    if (A.ConnectToScout(primary_id)) {
-        D(cout << "SA" << A.S->get_pid() << ": Connected to scout of S"
-          << primary_id << endl;)
-    } else {
-        D(cout << "SA" << A.S->get_pid() << ": ERROR in connecting to scout of S"
-          << primary_id << endl;)
-        return NULL;
+    if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
+        D(cout << "SA" << S->get_pid() << ": ERROR in sending " << type << endl;)
     }
-
-    A.AcceptorMode();
+    else {
+        D(cout << "SA" << S->get_pid() << ": " << type << " message sent: " << msg << endl;)
+    }
 }
 
 /**
@@ -150,7 +139,7 @@ void Acceptor::SendP1b(const Ballot& b, const unordered_set<Triple> &st)
     string msg = kP1b + kInternalDelim + to_string(S->get_pid());
     msg += kInternalDelim + ballotToString(b) + kInternalDelim;
     msg += tripleSetToString(st) + kMessageDelim;
-    S->Unicast(kP1b, msg);
+    Unicast(kP1b, msg);
 }
 
 /**
@@ -162,7 +151,7 @@ void Acceptor::SendP2b(const Ballot& b, int return_fd)
 {
     string msg = kP2b + kInternalDelim + to_string(S->get_pid());
     msg += kInternalDelim + ballotToString(b) + kMessageDelim;
-    S->Unicast(kP2b, msg, return_fd);
+    Unicast(kP2b, msg, return_fd);
 }
 
 /**
@@ -218,7 +207,7 @@ void Acceptor::AcceptorMode()
                             std::vector<string> token = split(string(msg), kInternalDelim[0]);
                             if (token[0] == kP1a)
                             {
-                                D(cout << "SA" << S->get_pid() << ": Received P1a message" <<  endl;)
+                                D(cout << "SA" << S->get_pid() << ": Received P1A message" <<  endl;)
                                 Ballot recvd_ballot = stringToBallot(token[2]);
                                 if (recvd_ballot > get_best_ballot_num())
                                     set_best_ballot_num(recvd_ballot);
@@ -226,7 +215,7 @@ void Acceptor::AcceptorMode()
                             }
                             else if (token[0] == kP2a)
                             {
-                                D(cout << "SA" << S->get_pid() << ": Received P2a message" <<  endl;)
+                                D(cout << "SA" << S->get_pid() << ": Received P2A message" <<  endl;)
 
                                 int return_fd = stoi(token[1]);
                                 Triple recvd_triple = stringToTriple(token[2]);
@@ -246,4 +235,32 @@ void Acceptor::AcceptorMode()
             }
         }
     }
+}
+
+/**
+ * thread entry function for acceptor
+ * @param  _S pointer to server class object
+ * @return    NULL
+ */
+void* AcceptorEntry(void *_S) {
+    Acceptor A((Server*)_S);
+
+    pthread_t accept_connections_thread;
+    CreateThread(AcceptConnectionsAcceptor, (void*)&A, accept_connections_thread);
+
+    int primary_id = A.S->get_primary_id();
+
+    // sleep for some time to make sure accept threads of scouts are running
+    usleep(kGeneralSleep);
+    usleep(kGeneralSleep);
+    if (A.ConnectToScout(primary_id)) {
+        D(cout << "SA" << A.S->get_pid() << ": Connected to scout of S"
+          << primary_id << endl;)
+    } else {
+        D(cout << "SA" << A.S->get_pid() << ": ERROR in connecting to scout of S"
+          << primary_id << endl;)
+        return NULL;
+    }
+
+    A.AcceptorMode();
 }

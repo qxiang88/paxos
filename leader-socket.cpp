@@ -115,6 +115,7 @@ bool Leader::ConnectToCommander(const int server_id) {
         break;
     }
     if (l == NULL) {
+        cout<<"YO"<<endl;
         return false;
     }
     // int outgoing_port = ntohs(return_port_no((struct sockaddr *)l->ai_addr));

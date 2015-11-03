@@ -103,6 +103,16 @@ void Replica::CreateReceiveThreadsForClients() {
     }
 }
 
+void Replica::Unicast(const string &type, const string& msg)
+{
+    if (send(get_leader_fd(S->get_pid()), msg.c_str(), msg.size(), 0) == -1) {
+        D(cout << "SR" << S->get_pid() << ": ERROR in sending " << type << endl;)
+    }
+    else {
+        D(cout << "SR" << S->get_pid() << ": " << type << " message sent: " << msg << endl;)
+    }
+}
+
 /**
  * proposes the proposal to a leader
  * @param p Proposal to be proposed
@@ -136,7 +146,7 @@ void Replica::SendProposal(const int& s, const Proposal& p)
     string msg = kPropose + kInternalDelim;
     msg += to_string(s) + kInternalDelim;
     msg += proposalToString(p) + kMessageDelim;
-    S->Unicast(kPropose, msg);
+    Unicast(kPropose, msg);
 }
 
 /**
@@ -327,6 +337,7 @@ void* ReplicaEntry(void *_S) {
 
     // sleep for some time to make sure accept threads of commanders and scouts are running
     usleep(kGeneralSleep);
+    usleep(kGeneralSleep);
     int primary_id = R.S->get_primary_id();
     if (R.ConnectToCommander(primary_id)) {
         D(cout << "SR" << R.S->get_pid() << ": Connected to commander of S"
@@ -354,7 +365,7 @@ void* ReplicaEntry(void *_S) {
         R.CreateReceiveThreadsForClients();
     }
 
-    R.ReplicaMode();
+    // R.ReplicaMode();
 
     void *status;
     pthread_join(accept_connections_thread, &status);

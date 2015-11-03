@@ -23,6 +23,7 @@ public:
     void AcceptorMode();
     void SendP1b(const Ballot& b, const unordered_set<Triple> &st);
     void SendP2b(const Ballot& b, int return_fd);
+    void Unicast(const string &type, const string& msg, int r_fd = -1);
 
     int get_scout_fd(const int server_id);
     set<int> get_commander_fd_set();
