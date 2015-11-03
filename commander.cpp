@@ -78,16 +78,25 @@ void Commander::SendToServers(const string& type, const string& msg)
     int serv_fd;
     for (int i = 0; i < S->get_num_servers(); i++)
     {
-        if (type == kDecision)
-            serv_fd = get_replica_fd(i);
-        else if (type == kP1a) //p2a sent in commander
-            serv_fd = get_acceptor_fd(i);
-
-        if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
-            D(cout << "SC" << S->get_pid() << ": ERROR in sending to S" << (i) << endl;)
+        if (type == kDecision) {
+            if (send(get_replica_fd(i), msg.c_str(), msg.size(), 0) == -1) {
+                D(cout << "SC" << S->get_pid() << ": ERROR in sending to S" << (i) << endl;)
+                close(get_replica_fd(i));
+                set_replica_fd(i, -1);
+            }
+            else {
+                D(cout << "SC" << S->get_pid() << ": Message sent to S" << (i) << endl;)
+            }
         }
-        else {
-            D(cout << "SC" << S->get_pid() << ": Message sent to S" << (i) << endl;)
+        else if (type == kP1a) {//p2a sent in commander
+            if (send(get_acceptor_fd(i), msg.c_str(), msg.size(), 0) == -1) {
+                D(cout << "SC" << S->get_pid() << ": ERROR in sending to S" << (i) << endl;)
+                close(get_acceptor_fd(i));
+                set_acceptor_fd(i, -1);
+            }
+            else {
+                D(cout << "SC" << S->get_pid() << ": Message sent to S" << (i) << endl;)
+            }
         }
     }
 }
@@ -102,7 +111,9 @@ void Commander::SendP2a(const Triple & t, vector<int> acceptor_peer_fd)
         msg += kInternalDelim + tripleToString(t) + kMessageDelim;
 
         if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
-            D(cout << "SC" << S->get_pid() << ": ERROR in sending Phase2A message to acceptor S" << i << endl;)
+            D(cout << "SC" << S->get_pid() << ": ERROR in sending P2A message to acceptor S" << i << endl;)
+            close(serv_fd);
+            set_acceptor_fd(i, -1);
         }
         else {
             D(cout << "SC" << S->get_pid() << ": Phase2A message sent to acceptor S" << i << endl;)
@@ -210,9 +221,12 @@ void* CommanderMode(void* _rcv_thread_arg) {
                     char buf[kMaxDataSize];
                     if ((num_bytes = recv(C->get_acceptor_fd(i), buf, kMaxDataSize - 1, 0)) == -1) {
                         D(cout << "SC" << C->S->get_pid() << ": ERROR in receiving p2b from acceptor S" << i << endl;)
-                        // pthread_exit(NULL); //TODO: think about whether it should be exit or not
+                        close(C->get_acceptor_fd(i));
+                        C->set_acceptor_fd(i, -1);
                     } else if (num_bytes == 0) {     //connection closed
                         D(cout << "SC" << C->S->get_pid() << ": Connection closed by acceptor S" << i << endl;)
+                        close(C->get_acceptor_fd(i));
+                        C->set_acceptor_fd(i, -1);
                     } else {
                         buf[num_bytes] = '\0';
                         std::vector<string> message = split(string(buf), kMessageDelim[0]);

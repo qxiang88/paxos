@@ -152,10 +152,15 @@ void* ScoutMode(void* _rcv_thread_arg) {
                 if (FD_ISSET(SC->get_acceptor_fd(i), &acceptor_set)) { // we got one!!
                     char buf[kMaxDataSize];
                     if ((num_bytes = recv(SC->get_acceptor_fd(i), buf, kMaxDataSize - 1, 0)) == -1) {
-                        D(cout << "SS" << SC->S->get_pid() << ": ERROR in receiving p1b from acceptor S" << i << endl;)
-                        // pthread_exit(NULL); //TODO: think about whether it should be exit or not
+                        D(cout << "SS" << SC->S->get_pid()
+                          << ": ERROR in receiving p1b from acceptor S" << i << endl;)
+                        close(SC->get_acceptor_fd(i));
+                        SC->set_acceptor_fd(i, -1);
                     } else if (num_bytes == 0) {     //connection closed
-                        D(cout << "SS" << SC->S->get_pid() << ": ERROR Connection closed connection closed by acceptor S" << i << endl;)
+                        D(cout << "SS" << SC->S->get_pid()
+                          << ": ERROR Connection closed connection closed by acceptor S" << i << endl;)
+                        close(SC->get_acceptor_fd(i));
+                        SC->set_acceptor_fd(i, -1);
                     } else {
                         buf[num_bytes] = '\0';
                         std::vector<string> message = split(string(buf), kMessageDelim[0]);

@@ -123,6 +123,12 @@ void Acceptor::Unicast(const string &type, const string& msg, int r_fd)
 
     if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
         D(cout << "SA" << S->get_pid() << ": ERROR in sending " << type << endl;)
+        if (serv_fd == get_scout_fd(S->get_primary_id())) {
+            close(serv_fd);
+            set_scout_fd(S->get_primary_id(), -1);
+        } else {
+            RemoveFromCommanderFDSet(serv_fd);
+        }
     }
     else {
         D(cout << "SA" << S->get_pid() << ": " << type << " message sent: " << msg << endl;)
@@ -169,7 +175,8 @@ void Acceptor::AcceptorMode()
 
         int fd_max, fd_temp;
         GetCommanderFdSet(recv_from, fds, fd_max);
-        fd_temp = get_scout_fd(S->get_primary_id());
+        int primary_id = S->get_primary_id();
+        fd_temp = get_scout_fd(primary_id);
         if (fd_temp != -1)
         {
             fds.push_back(fd_temp);
@@ -194,12 +201,20 @@ void Acceptor::AcceptorMode()
                     char buf[kMaxDataSize];
                     if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1) {
                         D(cout << "SA" << S->get_pid() << ": ERROR in receiving from scout or commander" << endl;)
-                        if (i != fds.size() - 1)
+                        if (i != fds.size() - 1) {
                             RemoveFromCommanderFDSet(fds[i]);
+                        } else { // scout fd
+                            close(fds[i]);
+                            set_scout_fd(primary_id, -1);
+                        }
                     } else if (num_bytes == 0) {     //connection closed
                         D(cout << "SA" << S->get_pid() << ": Connection closed by scout or commander." << endl;)
-                        if (i != fds.size() - 1)
+                        if (i != fds.size() - 1) {
                             RemoveFromCommanderFDSet(fds[i]);
+                        } else { // scout fd
+                            close(fds[i]);
+                            set_scout_fd(primary_id, -1);
+                        }
                     } else {
                         buf[num_bytes] = '\0';
                         std::vector<string> message = split(string(buf), kMessageDelim[0]);

@@ -289,10 +289,12 @@ void* ReceiveMessagesFromPrimary(void* _C) {
         if (num_bytes == -1) {
             // D(cout << "C" << C->get_pid() <<
             // " : ERROR in receiving message from primary S" << primary_id << endl;)
+            usleep(kSelectSleep);
         } else if (num_bytes == 0) {    // connection closed by primary
             // D(cout << "C" << C->get_pid() << " : Connection closed by primary S" << primary_id << endl;)
             //TODO: Need to take some action like increment primary_id?
             //or wait for update command from master?
+            usleep(kSelectSleep);
         } else {
             buf[num_bytes] = '\0';
 
