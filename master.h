@@ -3,6 +3,7 @@
 #include "vector"
 #include "string"
 #include "fstream"
+#include "iostream"
 using namespace std;
 
 class Master {
@@ -24,6 +25,10 @@ public:
     void ReceiveChatLogFromClient(const int client_id, string &chat_log);
     void PrintChatLog(const int client_id, const string &chat_log);
     void SendAllClearToServers();
+    void WaitForAllClearDone();
+    void GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, int& fd_max);
+    void ConstructAllClearMessage(string &message);
+
 
 
     int get_server_fd(const int server_id);
@@ -35,7 +40,7 @@ public:
     int get_client_pid(const int client_id);
     int get_primary_id();
     int get_num_servers();
-    set<int> get_server_fd_set();
+    std::vector<int> get_server_fd_set();
 
 
 
