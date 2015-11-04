@@ -26,6 +26,8 @@ unordered_set<Triple> stringToTripleSet(const string& s);
 string tripleSetToString(const unordered_set<Triple>& st);
 Ballot stringToBallot(const string& s);
 Proposal stringToProposal(const string& s);
+string decisionsToString(const map<int, Proposal>& d);
+string decisionToString(const int& s, const Proposal& p);
 
 void union_set(unordered_set<Triple>& s1, unordered_set<Triple>&s2);
 map<int, Proposal> pmax(const unordered_set<Triple> &pvalues);

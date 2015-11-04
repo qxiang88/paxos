@@ -37,10 +37,12 @@ public:
 
     Server *S;
     std::map<int, Proposal> proposals_;
+    std::map<int, Proposal> decisions_; //for ALL CLEAR
 
 private:
     Ballot ballot_num_;
     bool leader_active_;
+    int num_commanders_;
 
     std::vector<int> commander_fd_;
     std::vector<int> scout_fd_;

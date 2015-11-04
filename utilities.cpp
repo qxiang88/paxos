@@ -145,6 +145,47 @@ string tripleSetToString(const unordered_set<Triple>& st)
     return rval;
 }
 
+string allDecisionsToString(const map<int, Proposal>& d)
+{
+   string rval;
+    for (auto it=d.begin(); it!=d.end(); it++)
+    {
+        if(it!=d.begin())
+            rval += kInternalSetDelim;
+        rval += decisionToString(it->first, it->second);
+    }
+    return rval;
+}
+
+string decisionToString(const int& s, const Proposal& p)
+{
+    string rval;
+    rval += to_string(s);
+    rval += kInternalStructDelim;
+    rval += proposalToString(p);
+    return rval;
+}
+
+void stringToDecision(const string& dec, int& s, Proposal& p)
+{
+    vector<string> parts = split(dec, kInternalStructDelim);
+    if(parts.size()!=1)
+        D(cout<<"Cant convert to decision. Error."<<endl;)
+    s = stoi(parts[0]);
+    p = stringToProposal(parts[1]);
+}
+
+void stringToAllDecisions(string s, map<int, Proposal>& decs)
+{
+     vector<string> decisions = split(s, kInternalSetDelim);
+     for(auto &d : decisions)
+     {
+        int s;
+        Proposal p;
+        stringToDecision(s, p);
+        decs[s]=p;
+     }
+}
 
 Triple stringToTriple(const string& s)
 {

@@ -50,7 +50,8 @@ private:
     std::vector<int> scout_fd_;
     std::vector<int> leader_fd_;
     std::vector<int> client_chat_fd_;
-
+    
+    vector<Proposal> buffered_proposals_;
 };
 
 struct ReceiveThreadArgument {

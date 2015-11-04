@@ -236,7 +236,7 @@ void* ReceiveMessagesFromMaster(void* _C) {
     Client* C = (Client*)_C;
     char buf[kMaxDataSize];
     int num_bytes;
-
+    
     while (true) {  // always listen to messages from the master
         num_bytes = recv(C->get_master_fd(), buf, kMaxDataSize - 1, 0);
         if (num_bytes == -1) {

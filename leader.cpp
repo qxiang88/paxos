@@ -26,6 +26,7 @@ typedef pair<int, Proposal> SPtuple;
 
 extern void* CommanderMode(void* _rcv_thread_arg);
 
+
 Leader::Leader(Server* _S) {
     S = _S;
 
@@ -37,6 +38,8 @@ Leader::Leader(Server* _S) {
     commander_fd_.resize(num_servers, -1);
     scout_fd_.resize(num_servers, -1);
     replica_fd_.resize(num_servers, -1);
+
+    num_commanders_ = 0;
 }
 
 int Leader::get_commander_fd(const int server_id) {
@@ -111,6 +114,28 @@ void Leader::GetFdSet(fd_set& recv_from_set, int& fd_max, vector<int>& fds)
     fd_max = max(fd_max, fd_temp);
     fds.push_back(fd_temp);
 }
+
+void Leader::SendReplicasAllDecisions()
+{
+    string msg = kAllDecisions;
+    msg += allDecisionsToString(decisions_);
+    msg += kMessageDelim;
+
+    for(int i=0; i<get_num_servers(); i++)
+    {    
+        if (send(get_replica_fd(i), msg.c_str(), msg.size(), 0) == -1) {
+            D(cout << "L" << S->get_pid()
+              << ": ERROR in sending all decisions to replica " <<i<< endl;)
+            close(get_replica_fd(i));
+            set_replica_fd(i, -1);
+        }
+        else {
+            D(cout << "L" << S->get_pid()
+              << ": All Decisions sent to replica "<<i<<": " << msg << endl;)
+        }
+    }
+}
+
 /**
  * thread entry function for leader
  * @param  _S pointer to server class object
@@ -142,14 +167,16 @@ void* LeaderEntry(void *_S) {
           << primary_id << endl;)
         return NULL;
     }
-
-    if (L.ConnectToReplica(primary_id)) { // same as R.S->get_pid()
-        D(cout << "SL" << L.S->get_pid() << ": Connected to replica of S"
-          << primary_id << endl;)
-    } else {
-        D(cout << "SL" << L.S->get_pid() << ": ERROR in connecting to replica of S"
-          << primary_id << endl;)
-        return NULL;
+    for(int i=0; i<get_num_servers(); i++)
+    {
+        if (L.ConnectToReplica(i)) { // same as R.S->get_pid()
+            D(cout << "SL" << L.S->get_pid() << ": Connected to replica of S"
+              << i << endl;)
+        } else {
+            D(cout << "SL" << L.S->get_pid() << ": ERROR in connecting to replica of S"
+              << i << endl;)
+            return NULL;
+        }
     }
 
     L.LeaderMode();
@@ -168,7 +195,6 @@ void Leader::LeaderMode()
     arg->ball = get_ballot_num();
     CreateThread(ScoutMode, (void*)arg, scout_thread);
 
-
     int num_servers = S->get_num_servers();
 
     while (true) {
@@ -176,6 +202,14 @@ void Leader::LeaderMode()
         int fd_max;
         vector<int> fds;
         GetFdSet(recv_from_set, fd_max, fds);
+
+        while(!num_commanders_ && S->get_all_clear(kLeaderRole))
+        {
+            //means all done. just waiting for all clear to be lifted
+            usleep(kAllClearSleep);
+            //confirm no issues with select
+        }
+
 
         int rv = select(fd_max + 1, &recv_from_set, NULL, NULL, NULL);
 
@@ -218,6 +252,7 @@ void Leader::LeaderMode()
                                         Triple tempt = Triple(get_ballot_num(), stoi(token[1]), proposals_[stoi(token[1])]);
                                         arg->toSend = tempt;
                                         CreateThread(CommanderMode, (void*)arg, commander_thread);
+                                        num_commanders_++;
                                     }
                                 }
                             }
@@ -244,13 +279,14 @@ void Leader::LeaderMode()
                                     arg->toSend = tempt;
                                     CreateThread(CommanderMode, (void*)arg, commander_thread[i]);
                                     i++;
+                                    num_commanders_++;
                                 }
                                 set_leader_active(true);
                             }
 
                             else if (token[0] == kPreEmpted)
                             {
-                                D(cout << "SL" << S->get_pid() << ": PreEmpted message received: " << buf <<  endl;)
+                                D(cout << "SL" << S->get_pid() << ": PreEmpted message received: " << msg <<  endl;)
                                 Ballot recvd_b = stringToBallot(token[1]);
                                 if (recvd_b > get_ballot_num())
                                 {
@@ -263,6 +299,21 @@ void Leader::LeaderMode()
                                     arg->SC = S->get_scout_object();
                                     arg->ball = get_ballot_num();
                                     CreateThread(ScoutMode, (void*)arg, scout_thread);
+                                }
+                            }
+                            else if (token[0] == kDecision)
+                            {
+                                D(cout << "SL" << S->get_pid() << ": Decision message received from commander: " << msg <<  endl;)
+                                int s = stoi(token[1]);
+                                Proposal p = stringToProposal(token[2]);
+                                decisions_[s] = p;
+                                num_commanders_--;
+
+                                if(!num_commanders_ && S->get_all_clear(kLeaderRole))
+                                {
+                                    SendReplicaAllDecisions();
+                                    S->set_all_clear(kReplicaRole, kAllClearDone);
+                                    // set_all_clear(kLeaderRole, false);
                                 }
                             }
                             else {    //other messages

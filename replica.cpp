@@ -179,6 +179,33 @@ void Replica::SendResponseToAllClients(const int& s, const Proposal& p)
     }
 }
 
+void Replica::ProposeBuffered()
+{
+    for(auto pit = buffered_proposals_.begin(); pit!=buffered_proposals_.end(); pit++)
+        {
+            Propose(*pit);
+        }
+        buffered_proposals_.clear();
+}
+
+bool Replica::CheckEqualDecisions(map<int, Proposal>& allDecisions)
+{
+    for(auto it=allDecisions.begin(); it!=allDecisions.end(); it++)
+    {
+        if(decisions_.find(it->first)==decisions_.end())
+        {
+            return false;
+        }
+        else
+        {
+            //should never happen
+            if(decisions_[it->first]!=allDecisions[it->first])
+                return false;
+        }
+    }
+
+    return true;
+}
 /**
  * function for performing replica related job
  */
@@ -189,6 +216,7 @@ void Replica::ReplicaMode()
 
     fd_set fromset, temp_set;
     vector<int> fds;
+    map<int, Proposal> allDecs;
 
     while (true) {  // always listen to messages from the acceptors
         int fd_max = INT_MIN, fd_temp;
@@ -221,6 +249,8 @@ void Replica::ReplicaMode()
         fds.push_back(fd_temp);
         FD_SET(fd_temp, &fromset);
 
+        ProposeBuffered();
+
         int rv = select(fd_max + 1, &fromset, NULL, NULL, NULL);
         if (rv == -1) { //error in select
             D(cout << "SR" << S->get_pid() << ": ERROR in select()" << endl;)
@@ -244,7 +274,15 @@ void Replica::ReplicaMode()
                             {
                                 D(cout << "SR" << S->get_pid() << ": Received chat from client: " << buf <<  endl;)
                                 Proposal p = stringToProposal(token[1]);
-                                Propose(p);
+                                if(S->get_all_clear(kReplicaRole)!=kAllClearNotSet)
+                                {
+                                    buffered_proposals_.push_back(p);
+                                }
+                                else
+                                {
+                                    ProposeBuffered();
+                                    Propose(p);
+                                }
                             }
                             else if (token[0] == kDecision)
                             {
@@ -268,6 +306,15 @@ void Replica::ReplicaMode()
                                     //s has to slot_num. check if it is slotnum in recovery too.
                                     //if so can remove argument from perform, sendresponse functions
                                 }
+
+                                if(CheckEqualDecisions(allDecs))
+                                {
+                                    S->set_all_clear(kReplicaRole, kAllClearDone);
+                                }
+                            }
+                            else if(token[0]==kAllDecisions)
+                            {
+                                stringToAllDecisions(token[1], allDecs);
                             }
                             else {    //other messages
                                 D(cout << "SR" << S->get_pid() << ": ERROR Unexpected message received: " << msg << endl;)

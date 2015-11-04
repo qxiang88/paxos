@@ -31,6 +31,7 @@ public:
     int get_pid();
     int get_num_servers();
     int get_num_clients();
+    string get_all_clear(string);
     int get_master_port();
     int get_server_listen_port(const int server_id);
     int get_client_listen_port(const int client_id);
@@ -49,6 +50,8 @@ public:
     void set_master_fd(const int fd);
     void set_primary_id(const int primary_id);
     void set_scout_object();
+    void set_all_clear(string, string);
+
 
 private:
     int pid_;   // server's ID
@@ -58,6 +61,8 @@ private:
 
     int master_fd_;
     
+    std::map<string, string> all_clear_;
+
     int master_port_;   // port used by master for communication
     std::vector<int> server_listen_port_;
     std::vector<int> client_listen_port_;

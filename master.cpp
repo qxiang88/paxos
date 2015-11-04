@@ -57,6 +57,14 @@ int Master::get_primary_id() {
     return primary_id_;
 }
 
+set<int> Acceptor::get_server_fd_set() {
+    return server_fd_;
+}
+
+int Master::get_num_servers() {
+    return num_servers_;
+}
+
 void Master::set_server_pid(const int server_id, const int pid) {
     server_pid_[server_id] = pid;
 }
@@ -178,7 +186,8 @@ void Master::ReadTest() {
 
         }
         if (keyword == kAllClear) {
-
+            SendAllClearToServers(); //sends to primary server
+            WaitForAllClearDone();
         }
         if (keyword == kTimeBombLeader) {
 
@@ -192,6 +201,115 @@ void Master::ReadTest() {
             string chat_log;
             ReceiveChatLogFromClient(client_id, chat_log);
             PrintChatLog(client_id, chat_log);
+        }
+    }
+}
+
+void Master::ConstructAllClearMessage(string &message) {
+    message = kAllClear + kMessageDelim;
+}
+
+void Master::WaitForAllClearDone()
+{
+
+    fd_set server_set;
+    int fd_max;
+    vector<int> fd_vec;
+
+    while (true) {  // always listen to messages from the acceptors
+         GetServerFdSet(server_set, fd_vec, fd_max);
+        // if (fd_max == INT_MIN) {
+        //     D(cout << "M: Exiting because no servers sem to" << endl;)
+        //     return NULL;
+        // }
+        int rv = select(fd_max + 1, &server_set, NULL, NULL, NULL);
+
+        if (rv == -1) { //error in select
+            D(cout << "SC" << C->S->get_pid() << ": ERROR in select()" << endl;)
+        } else if (rv == 0) {
+            D(cout << "SC" << C->S->get_pid() << ": ERROR: Unexpected timeout in select()" << endl;)
+        } else {
+            for (int i = 0; i < num_servers; i++) {
+                if (FD_ISSET(fd_vec[i], &server_set)) { // we got one!!
+                    char buf[kMaxDataSize];
+                    if ((num_bytes = recv(fd_vec[i], buf, kMaxDataSize - 1, 0)) == -1) {
+                        D(cout << "M" << C->S->get_pid() << ": ERROR in receiving p2b from acceptor S" << i << endl;)
+                        close(C->get_acceptor_fd(i));
+                        C->set_acceptor_fd(i, -1);
+                    } else if (num_bytes == 0) {     //connection closed
+                        D(cout << "SC" << C->S->get_pid() << ": Connection closed by acceptor S" << i << endl;)
+                        close(C->get_acceptor_fd(i));
+                        C->set_acceptor_fd(i, -1);
+                    } else {
+                        buf[num_bytes] = '\0';
+                        std::vector<string> message = split(string(buf), kMessageDelim[0]);
+                        for (const auto &msg : message) {
+                            std::vector<string> token = split(string(msg), kInternalDelim[0]);
+                            if (token[0] == kP2b) {
+                                D(cout << "SC" << C->S->get_pid()
+                                  << ": P2b message received from acceptor S" << i << ": " << msg <<  endl;)
+
+                                // close connection with this acceptor
+                                // because no future communication with it will happen
+                                close(C->get_acceptor_fd(i));
+                                C->set_acceptor_fd(i, -1);
+
+                                Ballot recvd_ballot = stringToBallot(token[2]);
+                                if (recvd_ballot == toSend.b)
+                                {
+                                    waitfor--;
+                                    if (waitfor < (num_servers / 2))
+                                    {
+                                        C->SendDecision(toSend);
+                                        C->CloseAllConnections();
+                                        return NULL;
+                                    }
+                                } else {
+                                    C->SendPreEmpted(recvd_ballot);
+                                    C->CloseAllConnections();
+                                    return NULL;
+                                }
+                            } else {    //other messages
+                                D(cout << "SC" << C->S->get_pid() << ": Unexpected message received: " << msg << endl;)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void Master::SendAllClearToServers()
+{   
+    string message;
+    ConstructAllClearMessage(message);
+
+    for(int i=0; i<get_num_servers(); i++)
+    {
+        if (send(get_server_fd(i), message.c_str(), message.size(), 0) == -1) {
+            D(cout << "M  : ERROR: Cannot send all clear to server " <<i<<  endl;)
+        } else {
+            D(cout << "M  : All clear message sent to server " << i<< endl;)
+        }
+    }
+}
+
+void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, int& fd_max)
+{
+    int fd_temp;
+    fd_max = INT_MIN;
+    set<int> local_set = get_server_fd_set();
+    FD_ZERO(&server_fd_set);
+    server_fd_vec.clear();
+    for (auto it = local_set.begin(); it != local_set.end(); it++)
+    {
+        fd_temp = *it;
+        if (fd_temp != -1)
+        {
+            FD_SET(fd_temp, &server_fd_set);
+            fd_max = max(fd_max, fd_temp);
+            server_fd_vec.push_back(fd_temp);
         }
     }
 }

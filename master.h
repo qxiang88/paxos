@@ -23,6 +23,8 @@ public:
     void SendMessageToClient(const int client_id, const string &message);
     void ReceiveChatLogFromClient(const int client_id, string &chat_log);
     void PrintChatLog(const int client_id, const string &chat_log);
+    void SendAllClearToServers();
+
 
     int get_server_fd(const int server_id);
     int get_client_fd(const int client_id);
@@ -32,6 +34,10 @@ public:
     int get_server_pid(const int server_id);
     int get_client_pid(const int client_id);
     int get_primary_id();
+    int get_num_servers();
+    set<int> get_server_fd_set();
+
+
 
     void set_server_pid(const int server_id, const int pid);
     void set_client_pid(const int client_id, const int pid);

@@ -172,7 +172,7 @@ void* ScoutMode(void* _rcv_thread_arg) {
                                 {  
                                     union_set(pvalues, r);
                                     waitfor--;
-                                    if (waitfor < (num_servers / 2))
+                                    if ((float)waitfor < (num_servers / 2.0))
                                     {
                                         SC->SendAdopted(recvd_ballot, pvalues);
                                         return NULL;

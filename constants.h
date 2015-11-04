@@ -32,20 +32,28 @@ const string kInternalSetDelim = ",";
 const string kChat = "CHAT";
 const string kChatLog = "CHATLOG";
 
-
 const string kP1a = "P1A";
 const string kP2a = "P2A";
 const string kP1b = "P1B";
 const string kP2b = "P2B";
 const string kDecision = "DECISION";
+const string kAllDecisions = "ALLDECISIONS";
 const string kPreEmpted = "PREEMPTED";
 const string kAdopted = "ADOPTED";
 const string kPropose = "PROPOSE";
 const string kResponse = "RESPONSE";
 
+const string kLeaderRole = "LEADER";
+const string kReplicaRole = "REPLICA";
+
+const string kAllClearSet = "SET";
+const string kAllClearNotSet = "NOTSET";
+const string kAllClearDone = "DONE";
+
 // sleep values
 const time_t kGeneralSleep = 1000 * 1000;
 const time_t kBusyWaitSleep = 500 * 1000;
+const time_t kAllClearSleep = 500 * 1000;
 
 // timeout values
 const timeval kReceiveTimeoutTimeval = {

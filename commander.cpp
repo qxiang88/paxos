@@ -117,6 +117,8 @@ void Commander::SendDecision(const Triple &t)
     string msg = kDecision + kInternalDelim + to_string(t.s) + kInternalDelim;
     msg += proposalToString(t.p)  + kMessageDelim;
     SendToServers(kDecision, msg);
+    Unicast(kDecision, msg);
+
 }
 
 void Commander::SendPreEmpted(const Ballot& b)
