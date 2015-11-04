@@ -90,7 +90,7 @@ void Commander::SendToServers(const string& type, const string& msg)
     }
 }
 
-void Commander::SendP2a(const Triple & t, const vector<int> &acceptor_peer_fd)
+void Commander::SendP2a(const Triple &t, const vector<int> &acceptor_peer_fd)
 {
     int serv_fd;
     for (int i = 0; i < S->get_num_servers(); i++)
@@ -112,7 +112,7 @@ void Commander::SendP2a(const Triple & t, const vector<int> &acceptor_peer_fd)
     }
 }
 
-void Commander::SendDecision(const Triple & t)
+void Commander::SendDecision(const Triple &t)
 {
     string msg = kDecision + kInternalDelim + to_string(t.s) + kInternalDelim;
     msg += proposalToString(t.p)  + kMessageDelim;
@@ -189,12 +189,12 @@ void Commander::CloseAllConnections() {
 void* CommanderMode(void* _rcv_thread_arg) {
     CommanderThreadArgument *rcv_thread_arg = (CommanderThreadArgument *)_rcv_thread_arg;
     Commander *C = rcv_thread_arg->C;
-    Triple * toSend = rcv_thread_arg->toSend;
+    Triple toSend = rcv_thread_arg->toSend;
     int num_servers = C->S->get_num_servers();
 
     std::vector<int> acceptor_peer_fd(num_servers, -1);
     C->ConnectToAllAcceptors(acceptor_peer_fd);
-    C->SendP2a(*toSend, acceptor_peer_fd);
+    C->SendP2a(toSend, acceptor_peer_fd);
 
     int num_bytes;
 
@@ -248,12 +248,12 @@ void* CommanderMode(void* _rcv_thread_arg) {
                                 C->set_acceptor_fd(i, -1);
 
                                 Ballot recvd_ballot = stringToBallot(token[2]);
-                                if (recvd_ballot == toSend->b)
+                                if (recvd_ballot == toSend.b)
                                 {
                                     waitfor--;
                                     if (waitfor < (num_servers / 2))
                                     {
-                                        C->SendDecision(*toSend);
+                                        C->SendDecision(toSend);
                                         C->CloseAllConnections();
                                         return NULL;
                                     }

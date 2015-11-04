@@ -2,6 +2,7 @@
 #define MASTER_H_
 #include "vector"
 #include "string"
+#include "fstream"
 using namespace std;
 
 class Master {
@@ -21,7 +22,7 @@ public:
     void ConstructChatMessage(const string &chat_message, string &message);
     void SendMessageToClient(const int client_id, const string &message);
     void ReceiveChatLogFromClient(const int client_id, string &chat_log);
-    void PrintChatLog(const string &chat_log);
+    void PrintChatLog(const int client_id, const string &chat_log);
 
     int get_server_fd(const int server_id);
     int get_client_fd(const int client_id);
@@ -42,6 +43,8 @@ private:
     int num_servers_;
     int num_clients_;
     int primary_id_;
+
+    std::vector<ofstream> fout_;
 
     std::vector<int> server_pid_;
     std::vector<int> client_pid_;

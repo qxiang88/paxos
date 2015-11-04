@@ -81,7 +81,7 @@ private:
 
 struct CommanderThreadArgument {
     Commander *C;
-    Triple *toSend;
+    Triple toSend;
 };
 
 struct ScoutThreadArgument {

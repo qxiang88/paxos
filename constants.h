@@ -4,7 +4,7 @@
 using namespace std;
 
 // constants for socket connections
-const int kMaxDataSize = 200 ;          // max number of bytes we can get at once
+const int kMaxDataSize = 2000 ;          // max number of bytes we can get at once
 const int kBacklog = 10;                // how many pending connections queue will hold
 
 // filenames
@@ -19,9 +19,10 @@ const string kAllClear = "allClear";
 const string kTimeBombLeader = "timeBombLeader";
 const string kPrintChatLog = "printChatLog";
 
-// cpp file paths
+// file paths
 const string kServerExecutable = "./server";
 const string kClientExecutable = "./client";
+const string kChatLogFile = "./chatlog/log";
 
 // message templates
 const string kMessageDelim = "$";

@@ -191,7 +191,7 @@ void Master::ReadTest() {
             SendMessageToClient(client_id, message);
             string chat_log;
             ReceiveChatLogFromClient(client_id, chat_log);
-            PrintChatLog(chat_log);
+            PrintChatLog(client_id, chat_log);
         }
     }
 }
@@ -221,14 +221,15 @@ void Master::ReceiveChatLogFromClient(const int client_id, string &chat_log) {
  * prints chat log received from a client in the expected format
  * @param chat_log chat log in concatenated string format
  */
-void Master::PrintChatLog(const string &chat_log) {
+void Master::PrintChatLog(const int client_id, const string &chat_log) {
     std::vector<string> chat = split(chat_log, kMessageDelim[0]);
     for (auto &c : chat) {
         std::vector<string> token = split(c, kInternalDelim[0]);
         for (int i = 0; (i + 2) < token.size(); i = i + 3) {
-            cout << token[i] << " " << token[i + 1] << ": " << token[i + 2] << endl;
+            fout_[client_id] << token[i] << " " << token[i + 1] << ": " << token[i + 2] << endl;
         }
     }
+    fout_[client_id]<<"-------------"<<endl;
 }
 
 /**
@@ -242,6 +243,11 @@ void Master::Initialize() {
     client_fd_.resize(num_clients_, -1);
     server_listen_port_.resize(num_servers_);
     client_listen_port_.resize(num_clients_);
+    fout_.resize(num_clients_);
+
+    for (int i = 0; i < num_clients_; ++i) {
+        fout_[i].open(kChatLogFile + to_string(i), ios::app);
+    }
 }
 
 /**

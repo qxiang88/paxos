@@ -1,4 +1,4 @@
-all: master server client
+all: master server client cleanlog
 
 # master related
 master: master.o master-socket.o utilities.o
@@ -72,3 +72,6 @@ utilities.o: utilities.cpp utilities.h constants.h
 
 clean:
 	rm -f *.o master server client
+
+cleanlog:
+	rm -f chatlog/*

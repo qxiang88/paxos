@@ -216,7 +216,7 @@ void Leader::LeaderMode()
                                         CommanderThreadArgument* arg = new CommanderThreadArgument;
                                         arg->C = C;
                                         Triple tempt = Triple(get_ballot_num(), stoi(token[1]), proposals_[stoi(token[1])]);
-                                        arg->toSend = &tempt;
+                                        arg->toSend = tempt;
                                         CreateThread(CommanderMode, (void*)arg, commander_thread);
                                     }
                                 }
@@ -241,7 +241,7 @@ void Leader::LeaderMode()
                                     CommanderThreadArgument* arg = new CommanderThreadArgument;
                                     arg->C = C;
                                     Triple tempt = Triple(get_ballot_num(), stoi(token[1]), proposals_[stoi(token[1])]);
-                                    arg->toSend = &tempt;
+                                    arg->toSend = tempt;
                                     CreateThread(CommanderMode, (void*)arg, commander_thread[i]);
                                     i++;
                                 }

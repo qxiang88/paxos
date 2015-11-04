@@ -108,8 +108,9 @@ void Replica::Propose(const Proposal &p) {
     int min_slot;
     if (proposals_.rbegin() == proposals_.rend())
         min_slot = 0;
-    else
-        min_slot = proposals_.rbegin()->first;
+    else {
+        min_slot = proposals_.rbegin()->first + 1;
+    }
 
     while (decisions_.find(min_slot) != decisions_.end())
         min_slot++;
