@@ -127,8 +127,7 @@ void Commander::SendPreEmpted(const Ballot& b)
 
 void Commander::ConnectToAllAcceptors(std::vector<int> &acceptor_peer_fd) {
     int num_servers = S->get_num_servers();
-    cout << "numserver=" << num_servers << S->get_num_servers()<< endl;
-
+    
     for (int i = 0; i < num_servers; ++i) {
         if (!ConnectToAcceptor(i)) {
             D(cout << "SC" << S->get_pid() << ": ERROR in connecting to acceptor S" << i << endl;)

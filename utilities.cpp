@@ -1,5 +1,14 @@
 #include "utilities.h"
 
+#define DEBUG
+
+#ifdef DEBUG
+#  define D(x) x
+#else
+#  define D(x)
+#endif // DEBUG
+
+
 bool Proposal::operator==(const Proposal &p2) const {
     return ((this->client_id == p2.client_id) && (this->chat_id == p2.chat_id) && (this->msg == p2.msg));
 }

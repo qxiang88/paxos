@@ -263,6 +263,7 @@ void Replica::ReplicaMode()
                                             Propose(proposals_[slot_num]);
                                     }
                                     Perform(slot_num, currdecision);
+                                    slot_num = get_slot_num();
                                     //s has to slot_num. check if it is slotnum in recovery too.
                                     //if so can remove argument from perform, sendresponse functions
                                 }

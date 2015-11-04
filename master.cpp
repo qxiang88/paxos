@@ -15,7 +15,7 @@
 #include "sys/socket.h"
 using namespace std;
 
-#define DEBUG
+// #define DEBUG
 
 #ifdef DEBUG
 #  define D(x) x
@@ -129,7 +129,7 @@ bool Master::ReadPortsFile() {
             fin >> port;
             server_listen_port_[i] = port;
             for (int j = 0; j < 7; ++j) {
-                fin>>port;
+                fin >> port;
             }
         }
         fin.close();
@@ -184,6 +184,7 @@ void Master::ReadTest() {
 
         }
         if (keyword == kPrintChatLog) {
+            usleep(5000 * 1000);
             int client_id;
             iss >> client_id;
             string message = kChatLog + kInternalDelim;
@@ -211,6 +212,7 @@ void Master::ReceiveChatLogFromClient(const int client_id, string &chat_log) {
     } else {
         buf[num_bytes] = '\0';
         chat_log = string(buf);
+        // cout<<"CHATLOG"<<chat_log<<endl;
         // TODO: DOES NOT handle multiple chatlogs sent by the client in one go
     }
 }
@@ -220,9 +222,12 @@ void Master::ReceiveChatLogFromClient(const int client_id, string &chat_log) {
  * @param chat_log chat log in concatenated string format
  */
 void Master::PrintChatLog(const string &chat_log) {
-    std::vector<string> token = split(chat_log, kMessageDelim[0]);
-    for (int i = 0; (i + 2) < token.size(); i = i + 3) {
-        cout << token[i] << " " << token[i + 1] << ": " << token[i + 2] << endl;
+    std::vector<string> chat = split(chat_log, kMessageDelim[0]);
+    for (auto &c : chat) {
+        std::vector<string> token = split(c, kInternalDelim[0]);
+        for (int i = 0; (i + 2) < token.size(); i = i + 3) {
+            cout << token[i] << " " << token[i + 1] << ": " << token[i + 2] << endl;
+        }
     }
 }
 
@@ -271,7 +276,7 @@ bool Master::SpawnServers(const int n) {
             set_server_pid(i, pid);
         } else {
             D(cout << "M  : ERROR: Cannot spawn server S"
-                    << i << " - " << strerror(status) << endl);
+              << i << " - " << strerror(status) << endl);
             return false;
         }
     }
@@ -402,7 +407,7 @@ void Master::SendMessageToClient(const int client_id, const string &message) {
 int main() {
     Master M;
     M.ReadTest();
-    
+
     usleep(8000 * 1000);
     M.KillAllServers();
     M.KillAllClients();

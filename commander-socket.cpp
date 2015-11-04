@@ -127,7 +127,6 @@ void* AcceptConnectionsCommander(void* _C) {
  * @return  true if connection was successfull or already connected
  */
 bool Commander::ConnectToAcceptor(const int server_id) {
-    cout<<"server_id"<<server_id<<endl;
     int sockfd, numbytes;
     struct addrinfo hints, *servinfo, *l;
     char s[INET6_ADDRSTRLEN];
