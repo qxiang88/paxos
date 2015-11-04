@@ -89,27 +89,23 @@ void Leader::IncrementBallotNum() {
     set_ballot_num(b);
 }
 
-void Leader::GetFdSet(fd_set& recv_from_set, int& fd_max, vector<int>& fds)
+void Leader::GetFdSet(fd_set& recv_from_set, int& fd_max)
 {
     fd_max = INT_MIN;
     int fd_temp;
     FD_ZERO(&recv_from_set);
-    fds.clear();
 
     fd_temp = get_replica_fd(S->get_pid());
     FD_SET(fd_temp, &recv_from_set);
     fd_max = max(fd_max, fd_temp);
-    fds.push_back(fd_temp);
 
     fd_temp = get_scout_fd(S->get_pid());
     FD_SET(fd_temp, &recv_from_set);
     fd_max = max(fd_max, fd_temp);
-    fds.push_back(fd_temp);
 
     fd_temp = get_commander_fd(S->get_pid());
     FD_SET(fd_temp, &recv_from_set);
     fd_max = max(fd_max, fd_temp);
-    fds.push_back(fd_temp);
 }
 /**
  * thread entry function for leader
@@ -174,8 +170,7 @@ void Leader::LeaderMode()
     while (true) {
         fd_set recv_from_set;
         int fd_max;
-        vector<int> fds;
-        GetFdSet(recv_from_set, fd_max, fds);
+        GetFdSet(recv_from_set, fd_max);
 
         int rv = select(fd_max + 1, &recv_from_set, NULL, NULL, NULL);
 
@@ -184,12 +179,12 @@ void Leader::LeaderMode()
         } else if (rv == 0) {
             D(cout << "SL" << S->get_pid() << ": ERROR Unexpected select timeout" << endl;)
         } else {
-            for (int i = 0; i < fds.size(); i++)
+            for (int i = 0; i <= fd_max; i++)
             {
-                if (FD_ISSET(fds[i], &recv_from_set)) { // we got one!!
+                if (FD_ISSET(i, &recv_from_set)) { // we got one!!
                     char buf[kMaxDataSize];
                     int num_bytes;
-                    if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1)
+                    if ((num_bytes = recv(i, buf, kMaxDataSize - 1, 0)) == -1)
                     {
                         D(cout << "SL" << S->get_pid() << ": ERROR in receving" << endl;)
                         // pthread_exit(NULL); //TODO: think about whether it should be exit or not

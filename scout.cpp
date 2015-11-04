@@ -161,18 +161,18 @@ void* ScoutMode(void* _rcv_thread_arg) {
                             std::vector<string> token = split(string(msg), kInternalDelim[0]);
                             if (token[0] == kP1b) {
                                 D(cout << "SS" << SC->S->get_pid() << ": received P1B from acceptor S" << i <<  endl;)
-                                
+
                                 Ballot recvd_ballot = stringToBallot(token[2]);
                                 unordered_set<Triple> r;
 
-                                if(token.size()==4)
+                                if (token.size() == 4)
                                     r = stringToTripleSet(token[3]);
-                                
+
                                 if (recvd_ballot == ball)
-                                {  
+                                {
                                     union_set(pvalues, r);
                                     waitfor--;
-                                    if (waitfor < (num_servers / 2))
+                                    if ((float)waitfor < (num_servers / 2.0))
                                     {
                                         SC->SendAdopted(recvd_ballot, pvalues);
                                         return NULL;
@@ -191,6 +191,5 @@ void* ScoutMode(void* _rcv_thread_arg) {
             }
         }
     }
-    D(cout<<"Scout exiting"<<endl;)
     return NULL;
 }

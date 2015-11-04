@@ -18,7 +18,7 @@ public:
     bool ConnectToReplica(const int server_id);
     void LeaderMode();
     void IncrementBallotNum();
-    void GetFdSet(fd_set& recv_from_set, int& fd_max, vector<int>& fds);
+    void GetFdSet(fd_set& recv_from_set, int& fd_max);
 
 
     int get_commander_fd(const int server_id);

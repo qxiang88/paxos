@@ -188,7 +188,6 @@ void Replica::ReplicaMode()
     int num_bytes;
 
     fd_set fromset, temp_set;
-    vector<int> fds;
 
     while (true) {  // always listen to messages from the acceptors
         int fd_max = INT_MIN, fd_temp;
@@ -200,7 +199,6 @@ void Replica::ReplicaMode()
                 continue;
 
             fd_max = max(fd_max, fd_temp);
-            fds.push_back(fd_temp);
             FD_SET(fd_temp, &fromset);
         }
 
@@ -211,26 +209,23 @@ void Replica::ReplicaMode()
                 continue;
 
             fd_max = max(fd_max, fd_temp);
-            fds.push_back(fd_temp);
             FD_SET(fd_temp, &fromset);
         }
 
         //TODO: Use local primary_id from calling function or get_primary_id()?
         fd_temp = get_leader_fd(S->get_primary_id());
         fd_max = max(fd_max, fd_temp);
-        fds.push_back(fd_temp);
         FD_SET(fd_temp, &fromset);
-
         int rv = select(fd_max + 1, &fromset, NULL, NULL, NULL);
         if (rv == -1) { //error in select
             D(cout << "SR" << S->get_pid() << ": ERROR in select()" << endl;)
         } else if (rv == 0) {
             D(cout << "SR" << S->get_pid() << ": ERROR Unexpected select timeout" << endl;)
         } else {
-            for (int i = 0; i < fds.size(); i++) {
-                if (FD_ISSET(fds[i], &fromset)) { // we got one!!
+            for (int i = 0; i <= fd_max; i++) {
+                if (FD_ISSET(i, &fromset)) { // we got one!!
                     char buf[kMaxDataSize];
-                    if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1) {
+                    if ((num_bytes = recv(i, buf, kMaxDataSize - 1, 0)) == -1) {
                         D(cout << "SR" << S->get_pid()
                           << ": ERROR in receiving from commander or clients" << endl;)
                     } else if (num_bytes == 0) {     //connection closed
@@ -265,8 +260,8 @@ void Replica::ReplicaMode()
                                     }
                                     Perform(slot_num, currdecision);
                                     slot_num = get_slot_num();
-                                    //s has to slot_num. check if it is slotnum in recovery too.
-                                    //if so can remove argument from perform, sendresponse functions
+                                    // s has to slot_num. check if it is slotnum in recovery too.
+                                    // if so can remove argument from perform, sendresponse functions
                                 }
                             }
                             else {    //other messages

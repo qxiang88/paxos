@@ -15,7 +15,7 @@
 #include "sys/socket.h"
 using namespace std;
 
-// #define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
 #  define D(x) x
@@ -57,6 +57,10 @@ int Master::get_primary_id() {
     return primary_id_;
 }
 
+Status Master::get_server_status(const int server_id) {
+    return server_status_[server_id];
+}
+
 void Master::set_server_pid(const int server_id, const int pid) {
     server_pid_[server_id] = pid;
 }
@@ -77,6 +81,9 @@ void Master::set_primary_id(const int primary_id) {
     primary_id_ = primary_id;
 }
 
+void Master::set_server_status(const int server_id, const Status s) {
+    server_status_[server_id] = s;
+}
 /**
  * extracts chat message from the sendMessage command
  * @param command the sendMessage command given by user
@@ -170,8 +177,19 @@ void Master::ReadTest() {
             string message;
             ConstructChatMessage(chat_message, message);
             SendMessageToClient(client_id, message);
+            usleep(kGeneralSleep);
+            usleep(kGeneralSleep);
+            usleep(kGeneralSleep);
         }
         if (keyword == kCrashServer) {
+            int server_id;
+            iss >> server_id;
+
+            if (server_id != get_primary_id()) {
+                CrashServer(server_id);
+            } else {
+
+            }
 
         }
         if (keyword == kRestartServer) {
@@ -184,7 +202,7 @@ void Master::ReadTest() {
 
         }
         if (keyword == kPrintChatLog) {
-            usleep(5000 * 1000);
+            // usleep(5000 * 1000);
             int client_id;
             iss >> client_id;
             string message = kChatLog + kInternalDelim;
@@ -229,7 +247,7 @@ void Master::PrintChatLog(const int client_id, const string &chat_log) {
             fout_[client_id] << token[i] << " " << token[i + 1] << ": " << token[i + 2] << endl;
         }
     }
-    fout_[client_id]<<"-------------"<<endl;
+    fout_[client_id] << "-------------" << endl;
 }
 
 /**
@@ -244,6 +262,7 @@ void Master::Initialize() {
     server_listen_port_.resize(num_servers_);
     client_listen_port_.resize(num_clients_);
     fout_.resize(num_clients_);
+    server_status_.resize(num_servers_, RUNNING);
 
     for (int i = 0; i < num_clients_; ++i) {
         fout_[i].open(kChatLogFile + to_string(i), ios::app);
@@ -361,6 +380,8 @@ void Master::CrashServer(const int server_id) {
         kill(pid, SIGKILL);
         set_server_pid(server_id, -1);
         set_server_fd(server_id, -1);
+        set_server_status(server_id, DEAD);
+        D(cout << "M  : Server S" << server_id<<" killed" << endl;)
     }
 }
 

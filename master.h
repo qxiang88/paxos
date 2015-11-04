@@ -5,6 +5,10 @@
 #include "fstream"
 using namespace std;
 
+typedef enum {
+    DEAD, RUNNING, RECOVER
+} Status;
+
 class Master {
 public:
     bool ReadPortsFile();
@@ -32,12 +36,14 @@ public:
     int get_server_pid(const int server_id);
     int get_client_pid(const int client_id);
     int get_primary_id();
+    Status get_server_status(const int server_id);
 
     void set_server_pid(const int server_id, const int pid);
     void set_client_pid(const int client_id, const int pid);
     void set_server_fd(const int server_id, const int fd);
     void set_client_fd(const int client_id, const int fd);
     void set_primary_id(const int primary_id);
+    void set_server_status(const int server_id, const Status s);
 
 private:
     int num_servers_;
@@ -45,6 +51,7 @@ private:
     int primary_id_;
 
     std::vector<ofstream> fout_;
+    std::vector<Status> server_status_;
 
     std::vector<int> server_pid_;
     std::vector<int> client_pid_;

@@ -127,7 +127,7 @@ void Commander::SendPreEmpted(const Ballot& b)
 
 void Commander::ConnectToAllAcceptors(std::vector<int> &acceptor_peer_fd) {
     int num_servers = S->get_num_servers();
-    
+
     for (int i = 0; i < num_servers; ++i) {
         if (!ConnectToAcceptor(i)) {
             D(cout << "SC" << S->get_pid() << ": ERROR in connecting to acceptor S" << i << endl;)
@@ -199,7 +199,7 @@ void* CommanderMode(void* _rcv_thread_arg) {
     int num_bytes;
 
     fd_set acceptor_set;
-    int fd_max;
+    int fd_max = INT_MIN;
 
     int waitfor = num_servers;
     while (true) {  // always listen to messages from the acceptors
@@ -251,7 +251,7 @@ void* CommanderMode(void* _rcv_thread_arg) {
                                 if (recvd_ballot == toSend.b)
                                 {
                                     waitfor--;
-                                    if (waitfor < (num_servers / 2))
+                                    if ((float)waitfor < (num_servers / 2.0))
                                     {
                                         C->SendDecision(toSend);
                                         C->CloseAllConnections();
