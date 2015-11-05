@@ -115,8 +115,7 @@ break;
             } else {
                 process_id = R->S->IsReplicaPort(incoming_port);
                 if (process_id != -1) { //incoming connection from chat port of a client
-                    // R->set_replica_fd(process_id, new_fd);
-                    //not needed
+                    R->set_replica_fd(process_id, new_fd);
                 }
                 else{
                     D(cout << "SR" << R->S->get_pid() << ": ERROR: Unexpected connect request from port "

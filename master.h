@@ -26,14 +26,20 @@ public:
     void ExtractChatMessage(const string &command, string &message);
     void ConstructChatMessage(const string &chat_message, string &message);
     void SendMessageToClient(const int client_id, const string &message);
+    void SendMessageToServer(const int server_id, const string &message);
     void ReceiveChatLogFromClient(const int client_id, string &chat_log);
     void PrintChatLog(const int client_id, const string &chat_log);
+    void ElectNewLeader();
+    void TimeBombLeader(const int num_messages);
     void SendAllClearToServers(const string&);
     void WaitForAllClearDone();
-    void GetServerFdSet(fd_set& server_fd_set, int& fd_max);
+    void GetServerFdSet(fd_set& server_fd_set, vector<int>& fds, int& fd_max);
     void ConstructAllClearMessage(string &message, const string& type);
-    int GetServerIdWithFd(int);
-
+    // int GetServerIdWithFd(int);
+    void NewPrimaryElection();
+    void ElectNewPrimary();
+    void InformClientsAboutNewPrimary();
+    void InformServersAboutNewPrimary();
 
     int get_server_fd(const int server_id);
     int get_client_fd(const int client_id);
@@ -44,7 +50,6 @@ public:
     int get_client_pid(const int client_id);
     int get_primary_id();
     int get_num_servers();
-    std::vector<int> get_server_fd_set();
     Status get_server_status(const int server_id);
 
     void set_server_pid(const int server_id, const int pid);

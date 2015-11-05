@@ -5,7 +5,7 @@ using namespace std;
 
 // constants for socket connections
 const int kMaxDataSize = 2000 ;          // max number of bytes we can get at once
-const int kBacklog = 10;                // how many pending connections queue will hold
+const int kBacklog = 20;                // how many pending connections queue will hold
 
 // filenames
 const string kPortsFile = "./config/ports-file";
@@ -32,6 +32,9 @@ const string kInternalStructDelim = ".";
 const string kInternalSetDelim = ",";
 const string kChat = "CHAT";
 const string kChatLog = "CHATLOG";
+const string kNewPrimary = "NEWPRIMARY";
+const string kTimeBomb = "TIMEBOMB";
+const string kKillMe = "KILLME";
 
 const string kP1a = "P1A";
 const string kP2a = "P2A";

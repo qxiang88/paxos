@@ -99,13 +99,13 @@ int Server::get_master_fd() {
 string Server::get_all_clear(string role)
 {
     string temp;
-    if (role==kLeaderRole)
+    if (role == kLeaderRole)
     {
         pthread_mutex_lock(&all_clear_lock);
         temp = all_clear_[role];
         pthread_mutex_unlock(&all_clear_lock);
     }
-    if (role==kReplicaRole)
+    if (role == kReplicaRole)
     {
         pthread_mutex_lock(&all_clear_lock);
         temp = all_clear_[role];
@@ -147,13 +147,13 @@ void Server::set_scout_object() {
 
 void Server::set_all_clear(string role, string status)
 {
-    if (role==kLeaderRole)
+    if (role == kLeaderRole)
     {
         pthread_mutex_lock(&all_clear_lock);
         all_clear_[role] = status;
         pthread_mutex_unlock(&all_clear_lock);
     }
-    if (role==kReplicaRole)
+    if (role == kReplicaRole)
     {
         pthread_mutex_lock(&all_clear_lock);
         all_clear_[role] = status;
@@ -302,7 +302,7 @@ void Server::set_all_clear(string role, string status)
     leader_port_.resize(num_servers_);
 
     if (pthread_mutex_init(&all_clear_lock, NULL) != 0) {
-        D(cout << "S" << get_pid() << ": Mutex init failed" << endl;)
+        D(cout << "S" << get_pid() << " : Mutex init failed" << endl;)
     }
 
     set_all_clear(kLeaderRole, kAllClearNotSet);
@@ -328,38 +328,53 @@ void Server::set_all_clear(string role, string status)
 void Server::AllClearPhase()
 {
     sleep(2); //for testing allclear
-    set_all_clear(kReplicaRole, kAllClearSet);  
-    
-    if(get_pid()==get_primary_id())
-        set_all_clear(kLeaderRole, kAllClearSet); 
+    set_all_clear(kReplicaRole, kAllClearSet);
+
+    if (get_pid() == get_primary_id())
+        set_all_clear(kLeaderRole, kAllClearSet);
     else
-        set_all_clear(kLeaderRole, kAllClearDone); 
-    
-    while((get_all_clear(kReplicaRole)!=kAllClearDone) || (get_all_clear(kLeaderRole)!=kAllClearDone))
+        set_all_clear(kLeaderRole, kAllClearDone);
+
+    while ((get_all_clear(kReplicaRole) != kAllClearDone) || (get_all_clear(kLeaderRole) != kAllClearDone))
     {
         usleep(kAllClearSleep);
     }
 
     string message = kAllClearDone + kMessageDelim;
     if (send(get_master_fd(), message.c_str(), message.size(), 0) == -1) {
-        D(cout << "S"<<get_pid()<<" : ERROR: Cannot send all clear done to master"<<  endl;)
+        D(cout << "S" << get_pid() << " : ERROR: Cannot send all clear done to master" <<  endl;)
     } else {
-        D(cout << "S"<<get_pid()<<" : All clear done message sent to master"<<endl;)
+        D(cout << "S" << get_pid() << " : All clear done message sent to master" << endl;)
     }
     //wait for messages from leader and replica. once received. send to master
-
-    
 }
-
 
 void Server::FinishAllClear()
 {
-    set_all_clear(kReplicaRole, kAllClearNotSet);  
-    set_all_clear(kLeaderRole, kAllClearNotSet);      
+    set_all_clear(kReplicaRole, kAllClearNotSet);
+    set_all_clear(kLeaderRole, kAllClearNotSet);
 }
 
+/**
+ * handles functions to be executed on receipt of new primary
+ * @param new_primary_id id of the new primary elected
+ */
+ void Server::HandleNewPrimary(const int new_primary_id) {
+    set_primary_id(new_primary_id);
 
-void* ReceiveMessagesFromMaster(void* _S ){
+    if (get_pid() == get_primary_id()) {
+        Commander *C = new Commander(this, get_num_servers());
+        CommanderAcceptThread(C);
+
+        set_scout_object();
+        ScoutAcceptThread(get_scout_object());
+
+        pthread_t leader_thread;
+        CreateThread(LeaderEntry, (void*)this, leader_thread);
+    }
+}
+
+void* ReceiveMessagesFromMaster(void* _S ) {
     Server* S = (Server*)_S;
     char buf[kMaxDataSize];
     int num_bytes;
@@ -368,7 +383,7 @@ void* ReceiveMessagesFromMaster(void* _S ){
         if (num_bytes == -1) {
             D(cout << "S" << S->get_pid() << " : ERROR in receiving message from M" << endl;)
         } else if (num_bytes == 0) {    // connection closed by master
-            D(cout << "S" << S->get_pid() << " : Connection closed by Master." << endl;)
+            D(cout << "S" << S->get_pid() << " : Connection closed by M" << endl;)
         } else {
             buf[num_bytes] = '\0';
 
@@ -376,16 +391,17 @@ void* ReceiveMessagesFromMaster(void* _S ){
             std::vector<string> message = split(string(buf), kMessageDelim[0]);
             for (const auto &msg : message) {
                 std::vector<string> token = split(string(msg), kInternalDelim[0]);
-                if (token[0] == kAllClear) {                       
+                if (token[0] == kAllClear) {
                     S->AllClearPhase(); //send to (leader)x and replica
-
-                } 
-                else if(token[0]==kAllClearRemove)
+                }
+                else if (token[0] == kAllClearRemove)
                 {
                     S->FinishAllClear();
-                }
-                else {    //other messages
-                    D(cout<<"Sender "<<S->get_pid()<<" received unexpected message from master"<<endl;)
+                } else if (token[0] == kNewPrimary) {
+                    D(cout << "S" << S->get_pid() << " : Received new primary id S" << token[1] << endl;)
+                    S->HandleNewPrimary(stoi(token[1]));
+                } else {    //other messages
+                    D(cout << "S" << S->get_pid() << " : ERROR Unexpected message received from M" << endl;)
                 }
             }
         }
@@ -405,7 +421,6 @@ int main(int argc, char *argv[]) {
 
     if (S.get_pid() == S.get_primary_id()) {
         Commander *C = new Commander(&S, S.get_num_servers());
-        // Commander C();
         S.CommanderAcceptThread(C);
 
         S.set_scout_object();

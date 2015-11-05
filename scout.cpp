@@ -66,6 +66,8 @@ void Scout::SendToServers(const string& type, const string& msg)
     {
         if (send(get_acceptor_fd(i), msg.c_str(), msg.size(), 0) == -1) {
             D(cout << "SS" << S->get_pid() << ": ERROR: sending to acceptor S" << (i) << endl;)
+            close(get_acceptor_fd(i));
+            set_acceptor_fd(i, -1);
         }
         else {
             D(cout << "SS" << S->get_pid() << ": Message sent to acceptor S" << i << ": " << msg << endl;)
@@ -135,11 +137,17 @@ void* ScoutMode(void* _rcv_thread_arg) {
         int fd_max;
         SC->GetAcceptorFdSet(acceptor_set, fd_max);
 
-        int rv = select(fd_max + 1, &acceptor_set, NULL, NULL, NULL);
+        if (fd_max == INT_MIN) {
+            usleep(kBusyWaitSleep);
+            continue;
+        }
+
+        struct timeval timeout = kSelectTimeoutTimeval;
+        int rv = select(fd_max + 1, &acceptor_set, NULL, NULL, &timeout);
         if (rv == -1) { //error in select
             D(cout << "SS" << SC->S->get_pid() << ": ERROR in select()" << endl;)
         } else if (rv == 0) {
-            D(cout << "SS" << SC->S->get_pid() << ": ERROR Unexpected select timeout" << endl;)
+            // D(cout << "SS" << SC->S->get_pid() << ": ERROR Unexpected select timeout" << endl;)
         } else {
             for (int i = 0; i < num_servers; i++) {
                 if (FD_ISSET(SC->get_acceptor_fd(i), &acceptor_set)) { // we got one!!
@@ -160,7 +168,8 @@ void* ScoutMode(void* _rcv_thread_arg) {
                         for (const auto &msg : message) {
                             std::vector<string> token = split(string(msg), kInternalDelim[0]);
                             if (token[0] == kP1b) {
-                                D(cout << "SS" << SC->S->get_pid() << ": received P1B from acceptor S" << i <<  endl;)
+                                D(cout << "SS" << SC->S->get_pid()
+                                  << ": received P1B from acceptor S" << i << ": " << msg << endl;)
 
                                 Ballot recvd_ballot = stringToBallot(token[2]);
                                 unordered_set<Triple> r;

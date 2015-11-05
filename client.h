@@ -4,6 +4,7 @@
 #include "vector"
 #include "string"
 #include "map"
+#include "unordered_set"
 using namespace std;
 
 void* ReceiveMessagesFromMaster(void* _C);
@@ -39,6 +40,9 @@ public:
     void InitializeLocks();
     void ConstructChatLogMessage(string &msg);
     void SendChatLogToMaster();
+    void ResendChats();
+    void AddToDecidedChatIDs(const int chat_id);
+    void HandleNewPrimary(const int new_primary);
 
     int get_pid();
     int get_master_fd();
@@ -70,6 +74,7 @@ private:
 
     std::vector<string> chat_list_;
     std::vector<FinalChatLog> final_chat_log_;
+    std::unordered_set<int> decided_chat_ids_;
 };
 
 #endif //CLIENT_H_

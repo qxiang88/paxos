@@ -19,30 +19,33 @@ public:
     bool ConnectToCommander(const int server_id);
     bool ConnectToScout(const int server_id);
     bool ConnectToReplica(const int server_id);
-    void Propose(const Proposal &p);
-    void SendProposal(const int& s, const Proposal& p);
-    void Perform(const int& slot, const Proposal& p);
-    void SendResponseToAllClients(const int& s, const Proposal& p);
+    void Propose(const Proposal &p, const int primary_id);
+    void SendProposal(const int& s, const Proposal& p, const int primary_id);
+    void Perform(const int& slot, const Proposal& p, const int primary_id);
+    void SendResponseToAllClients(const int& s, const Proposal& p, const int primary_id);
+
     void IncrementSlotNum();
-    void ReplicaMode();
-    void Unicast(const string &type, const string& msg);
-    void ProposeBuffered();
+    void ReplicaMode(const int primary_id);
+    void Unicast(const string &type, const string& msg, const int primary_id);
+    void ProposeBuffered(const int primary_id);
     void CheckReceivedAllDecisions(map<int, Proposal>& allDecisions);
-    void CreateFdSet(fd_set& fromset, vector<int> &fds, int& fd_max);
+    void CheckAndDecrementWaitFor(vector<int>& waitfor, const int& s_fd);
+
+    void CreateFdSet(fd_set& fromset, vector<int> &fds, int& fd_max, const int primary_id);
     void RecoverDecisions();
-    void GetReplicaFdSet(fd_set& server_fd_set, int& fd_max);
-    int GetReplicaIdWithFd(int fd);
-    void SendDecisionsRequest();
-    void SendDecisionsResponse(int);
+    void GetReplicaFdSet(fd_set& server_fd_set, vector<int>&, int& fd_max);
+    vector<int> SendDecisionsRequest();
+    void SendDecisionsResponse(int, int);
     void MergeDecisions(map<int, Proposal>);
     void DecisionsRecoveryMode();
+    void ResetFD(const int fd, const int primary_id);
+
     int get_slot_num();
     int get_commander_fd(const int server_id);
     int get_scout_fd(const int server_id);
     int get_leader_fd(const int server_id);
     int get_client_chat_fd(const int client_id);
     int get_replica_fd(const int server_id);
-    vector<int> get_replica_fd_set();
     map<int, Proposal> get_decisions();
 
     void set_slot_num(const int slot_num);
@@ -68,7 +71,6 @@ private:
     std::vector<int> leader_fd_;
     std::vector<int> client_chat_fd_;
     std::vector<int> replica_fd_;
-    bool recovery_;
     vector<Proposal> buffered_proposals_;
 };
 

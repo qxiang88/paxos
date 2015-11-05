@@ -19,7 +19,7 @@ public:
     void LeaderMode();
     void IncrementBallotNum();
     void SendReplicasAllDecisions();
-    void GetFdSet(fd_set& recv_from_set, int& fd_max);
+    void GetFdSet(fd_set& recv_from_set, int& fd_max, std::vector<int> &fds);
 
     int get_commander_fd(const int server_id);
     int get_scout_fd(const int server_id);

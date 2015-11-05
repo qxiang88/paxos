@@ -35,8 +35,8 @@ public:
     void ScoutAcceptThread(Scout* SC);
     void AllClearPhase();
     void FinishAllClear();
-
-
+    void HandleNewPrimary(const int new_primary_id);
+    
     int get_pid();
     int get_num_servers();
     int get_num_clients();
@@ -72,7 +72,7 @@ private:
     Status mode_;
     
     int master_fd_;
-    
+
     std::map<string, string> all_clear_;
 
     int master_port_;   // port used by master for communication
