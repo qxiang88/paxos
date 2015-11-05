@@ -24,10 +24,10 @@ public:
     void SendMessageToClient(const int client_id, const string &message);
     void ReceiveChatLogFromClient(const int client_id, string &chat_log);
     void PrintChatLog(const int client_id, const string &chat_log);
-    void SendAllClearToServers();
+    void SendAllClearToServers(const string&);
     void WaitForAllClearDone();
     void GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, int& fd_max);
-    void ConstructAllClearMessage(string &message);
+    void ConstructAllClearMessage(string &message, const string& type);
 
 
 
@@ -55,7 +55,7 @@ private:
     int num_clients_;
     int primary_id_;
 
-    std::vector<ofstream> fout_;
+    // std::vector<ofstream> fout_;
 
     std::vector<int> server_pid_;
     std::vector<int> client_pid_;

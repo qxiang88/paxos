@@ -14,12 +14,14 @@ class Commander;
 class Scout;
 
 void* ReceiveMessagesFromClient(void* _rcv_thread_arg); //R
+void* ReceiveMessagesFromMaster(void* _S );
+
 
 class Server {
 public:
     void Initialize(const int pid,
-                    const int num_servers,
-                    const int num_clients);
+        const int num_servers,
+        const int num_clients);
     int IsReplicaPort(const int port);
     int IsAcceptorPort(const int port);
     int IsLeaderPort(const int port);
@@ -27,6 +29,9 @@ public:
     bool ReadPortsFile();
     void CommanderAcceptThread(Commander* C);
     void ScoutAcceptThread(Scout* SC);
+    void AllClearPhase();
+    void FinishAllClear();
+
 
     int get_pid();
     int get_num_servers();
@@ -45,6 +50,8 @@ public:
     int get_leader_port(const int server_id);
     int get_primary_id();  // common
     Scout* get_scout_object();
+    int get_master_fd();
+
 
     void set_pid(const int pid);
     void set_master_fd(const int fd);

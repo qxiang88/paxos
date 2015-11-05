@@ -16,7 +16,7 @@ using namespace std;
 
 typedef pair<int, Proposal> SPtuple;
 
-#define DEBUG
+// #define DEBUG
 
 #ifdef DEBUG
 #  define D(x) x
@@ -59,7 +59,7 @@ void Acceptor::set_best_ballot_num(const Ballot &b) {
  * adds the fd for communication with a commander to commander_fd_set_
  * @param fd fd to be added
  */
-void Acceptor::AddToCommanderFDSet(const int fd) {
+ void Acceptor::AddToCommanderFDSet(const int fd) {
     commander_fd_set_.insert(fd);
 }
 
@@ -67,7 +67,7 @@ void Acceptor::AddToCommanderFDSet(const int fd) {
  * removes the fd for communication with a commander from commander_fd_set_
  * @param fd fd to be removed
  */
-void Acceptor::RemoveFromCommanderFDSet(const int fd) {
+ void Acceptor::RemoveFromCommanderFDSet(const int fd) {
     close(fd);
     commander_fd_set_.erase(fd);
 }
@@ -78,8 +78,8 @@ void Acceptor::RemoveFromCommanderFDSet(const int fd) {
  * @param cfds_vec [out] vector correponding to the constructed fd_set
  * @param fd_max   [out] maximum value of fd in the constructed fd_set
  */
-void Acceptor::GetCommanderFdSet(fd_set& cfds_set, vector<int>& cfds_vec, int& fd_max)
-{
+ void Acceptor::GetCommanderFdSet(fd_set& cfds_set, vector<int>& cfds_vec, int& fd_max)
+ {
     int fd_temp;
     fd_max = INT_MIN;
     set<int> local_set = get_commander_fd_set();
@@ -102,7 +102,7 @@ void Acceptor::GetCommanderFdSet(fd_set& cfds_set, vector<int>& cfds_vec, int& f
  * back to the commander
  * @param fd acceptor side's fd for commander-acceptor connection
  */
-void Acceptor::SendBackOwnFD(const int fd) {
+ void Acceptor::SendBackOwnFD(const int fd) {
     string msg = to_string(fd);
     if (send(fd, msg.c_str(), msg.size(), 0) == -1) {
         D(cout << "SA" << S->get_pid() << ": ERROR: Cannot send fd to commander" << endl;)
@@ -140,8 +140,8 @@ void Acceptor::Unicast(const string &type, const string& msg, int r_fd)
  * @param b  current best ballot num of acceptor
  * @param st accepted set of acceptor
  */
-void Acceptor::SendP1b(const Ballot& b, const unordered_set<Triple> &st)
-{
+ void Acceptor::SendP1b(const Ballot& b, const unordered_set<Triple> &st)
+ {
     string msg = kP1b + kInternalDelim + to_string(S->get_pid());
     msg += kInternalDelim + ballotToString(b) + kInternalDelim;
     msg += tripleSetToString(st) + kMessageDelim;
@@ -153,8 +153,8 @@ void Acceptor::SendP1b(const Ballot& b, const unordered_set<Triple> &st)
  * @param b         current best ballot num of acceptor
  * @param return_fd acceptor side fd for the commander-acceptor connection
  */
-void Acceptor::SendP2b(const Ballot& b, int return_fd)
-{
+ void Acceptor::SendP2b(const Ballot& b, int return_fd)
+ {
     string msg = kP2b + kInternalDelim + to_string(S->get_pid());
     msg += kInternalDelim + ballotToString(b) + kMessageDelim;
     Unicast(kP2b, msg, return_fd);
@@ -163,8 +163,8 @@ void Acceptor::SendP2b(const Ballot& b, int return_fd)
 /**
  * function for performing acceptor related job
  */
-void Acceptor::AcceptorMode()
-{
+ void Acceptor::AcceptorMode()
+ {
     int num_bytes;
 
     fd_set recv_from;
@@ -257,7 +257,7 @@ void Acceptor::AcceptorMode()
  * @param  _S pointer to server class object
  * @return    NULL
  */
-void* AcceptorEntry(void *_S) {
+ void* AcceptorEntry(void *_S) {
     Acceptor A((Server*)_S);
 
     pthread_t accept_connections_thread;

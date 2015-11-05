@@ -24,6 +24,9 @@ public:
     void IncrementSlotNum();
     void ReplicaMode();
     void Unicast(const string &type, const string& msg);
+    void ProposeBuffered();
+    void CheckReceivedAllDecisions(map<int, Proposal>& allDecisions);
+    void CreateFdSet(fd_set& fromset, vector<int> &fds, int& fd_max);
 
     int get_slot_num();
     int get_commander_fd(const int server_id);

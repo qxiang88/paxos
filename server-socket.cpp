@@ -21,12 +21,14 @@ using namespace std;
 #  define D(x)
 #endif // DEBUG
 
+extern void* ReceiveMessagesFromMaster(void* _S );
+
 /**
  * returns port number
  * @param  sa sockaddr structure
  * @return    port number contained in sa
  */
-int return_port_no(struct sockaddr *sa) {
+ int return_port_no(struct sockaddr *sa) {
     if (sa->sa_family == AF_INET) {
         return (((struct sockaddr_in*)sa)->sin_port);
     }
@@ -40,11 +42,12 @@ void sigchld_handler(int s) {
     errno = saved_errno;
 }
 
+
 /**
  * function for server's accept connections thread
  * @param _S Pointer to server class object
  */
-void* AcceptConnectionsServer(void* _S) {
+ void* AcceptConnectionsServer(void* _S) {
     Server *S = (Server *)_S;
 
     int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
@@ -61,33 +64,33 @@ void* AcceptConnectionsServer(void* _S) {
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
     if ((rv = getaddrinfo(NULL, std::to_string(S->get_server_listen_port(S->get_pid())).c_str(),
-                          &hints, &servinfo)) != 0) {
+      &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-        exit (1);
-    }
+    exit (1);
+}
 
     // loop through all the results and bind to the first we can
-    for (l = servinfo; l != NULL; l = l->ai_next) {
-        if ((sockfd = socket(l->ai_family, l->ai_socktype,
-                             l->ai_protocol)) == -1) {
-            perror("server: socket ERROR");
-            continue;
-        }
+for (l = servinfo; l != NULL; l = l->ai_next) {
+    if ((sockfd = socket(l->ai_family, l->ai_socktype,
+       l->ai_protocol)) == -1) {
+        perror("server: socket ERROR");
+    continue;
+}
 
-        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
-                       sizeof(int)) == -1) {
-            perror("setsockopt ERROR");
-            exit(1);
-        }
+if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
+ sizeof(int)) == -1) {
+    perror("setsockopt ERROR");
+exit(1);
+}
 
-        if (bind(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
-            close(sockfd);
-            perror("server: bind ERROR");
-            continue;
-        }
+if (bind(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
+    close(sockfd);
+    perror("server: bind ERROR");
+    continue;
+}
 
-        break;
-    }
+break;
+}
     freeaddrinfo(servinfo); // all done with this structure
 
     if (l == NULL) {
@@ -122,6 +125,10 @@ void* AcceptConnectionsServer(void* _S) {
 
         if (incoming_port == S->get_master_port()) { // incoming connection from master_port
             S->set_master_fd(new_fd);
+
+            pthread_t receive_from_master_thread;
+            CreateThread(ReceiveMessagesFromMaster, (void*)S, receive_from_master_thread);
+
         } else {
             D(cout << "S" << S->get_pid() << ": ERROR: Unexpected connect request from port "
               << incoming_port << endl;)
@@ -129,3 +136,4 @@ void* AcceptConnectionsServer(void* _S) {
     }
     pthread_exit(NULL);
 }
+

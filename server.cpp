@@ -153,7 +153,7 @@ void Server::set_all_clear(string role, string status)
  * @return      id of client whose chat port matches param port
  * @return      -1 if param port is not the chat port of any client
  */
-int Server::IsClientChatPort(const int port) {
+ int Server::IsClientChatPort(const int port) {
     if (client_chat_port_map_.find(port) != client_chat_port_map_.end()) {
         return client_chat_port_map_[port];
     } else {
@@ -167,7 +167,7 @@ int Server::IsClientChatPort(const int port) {
  * @return      id of server whose replica port matches param port
  * @return      -1 if param port is not the replica port of any server
  */
-int Server::IsReplicaPort(const int port) {
+ int Server::IsReplicaPort(const int port) {
     if (replica_port_map_.find(port) != replica_port_map_.end()) {
         return replica_port_map_[port];
     } else {
@@ -181,7 +181,7 @@ int Server::IsReplicaPort(const int port) {
  * @return      id of server whose leader port matches param port
  * @return      -1 if param port is not the leader port of any server
  */
-int Server::IsLeaderPort(const int port) {
+ int Server::IsLeaderPort(const int port) {
     if (leader_port_map_.find(port) != leader_port_map_.end()) {
         return leader_port_map_[port];
     } else {
@@ -195,7 +195,7 @@ int Server::IsLeaderPort(const int port) {
  * @return      id of server whose acceptor port matches param port
  * @return      -1 if param port is not the acceptor port of any server
  */
-int Server::IsAcceptorPort(const int port) {
+ int Server::IsAcceptorPort(const int port) {
     if (acceptor_port_map_.find(port) != acceptor_port_map_.end()) {
         return acceptor_port_map_[port];
     } else {
@@ -207,7 +207,7 @@ int Server::IsAcceptorPort(const int port) {
  * reads ports-file and populates port related vectors/maps
  * @return true is ports-file was read successfully
  */
-bool Server::ReadPortsFile() {
+ bool Server::ReadPortsFile() {
     ifstream fin;
     fin.exceptions ( ifstream::failbit | ifstream::badbit );
     try {
@@ -266,9 +266,9 @@ bool Server::ReadPortsFile() {
  * @param  num_servers number of servers
  * @param  num_clients number of clients
  */
-void Server::Initialize(const int pid,
-                        const int num_servers,
-                        const int num_clients) {
+ void Server::Initialize(const int pid,
+    const int num_servers,
+    const int num_clients) {
     set_pid(pid);
     set_primary_id(0);
     num_servers_ = num_servers;
@@ -297,7 +297,7 @@ void Server::Initialize(const int pid,
 /**
  * creates accept thread for commander
  */
-void Server::CommanderAcceptThread(Commander* C) {
+ void Server::CommanderAcceptThread(Commander* C) {
     pthread_t accept_connections_thread;
     CreateThread(AcceptConnectionsCommander, (void*)C, accept_connections_thread);
 }
@@ -305,13 +305,14 @@ void Server::CommanderAcceptThread(Commander* C) {
 /**
  * creates accept thread for scout
  */
-void Server::ScoutAcceptThread(Scout* SC) {
+ void Server::ScoutAcceptThread(Scout* SC) {
     pthread_t accept_connections_thread;
     CreateThread(AcceptConnectionsScout, (void*)SC, accept_connections_thread);
 }
 
 void Server::AllClearPhase()
 {
+    // sleep(2); //for testing allclear
     set_all_clear(kReplicaRole, kAllClearSet);  
     
     if(get_pid()==get_primary_id())
@@ -324,23 +325,29 @@ void Server::AllClearPhase()
         usleep(kAllClearSleep);
     }
 
-
     string message = kAllClearDone + kMessageDelim;
     if (send(get_master_fd(), message.c_str(), message.size(), 0) == -1) {
         D(cout << "S"<<get_pid()<<" : ERROR: Cannot send all clear done to master"<<  endl;)
     } else {
-        D(cout << "S"<<get_pid()<<" : All clear message sent to master"<<endl;)
+        D(cout << "S"<<get_pid()<<" : All clear done message sent to master"<<endl;)
     }
     //wait for messages from leader and replica. once received. send to master
 
     
 }
 
-void* ReceiveMessagesFromMaster(void* _S {
+
+void Server::FinishAllClear()
+{
+    set_all_clear(kReplicaRole, kAllClearNotSet);  
+    set_all_clear(kLeaderRole, kAllClearNotSet);      
+}
+
+
+void* ReceiveMessagesFromMaster(void* _S ){
     Server* S = (Server*)_S;
     char buf[kMaxDataSize];
     int num_bytes;
-    
     while (true) {  // always listen to messages from the master
         num_bytes = recv(S->get_master_fd(), buf, kMaxDataSize - 1, 0);
         if (num_bytes == -1) {
@@ -355,9 +362,14 @@ void* ReceiveMessagesFromMaster(void* _S {
             for (const auto &msg : message) {
                 std::vector<string> token = split(string(msg), kInternalDelim[0]);
                 if (token[0] == kAllClear) {                       
-                        S->AllClearPhase(); //send to (leader)x and replica
+                    S->AllClearPhase(); //send to (leader)x and replica
 
-                } else {    //other messages
+                } 
+                else if(token[0]==kAllClearRemove)
+                {
+                    S->FinishAllClear();
+                }
+                else {    //other messages
                     D(cout<<"Sender "<<S->get_pid()<<" received unexpected message from master"<<endl;)
                 }
             }
@@ -365,6 +377,7 @@ void* ReceiveMessagesFromMaster(void* _S {
     }
     return NULL;
 }
+
 
 int main(int argc, char *argv[]) {
     Server S;
@@ -395,9 +408,6 @@ int main(int argc, char *argv[]) {
     if (S.get_pid() == S.get_primary_id()) {
         CreateThread(LeaderEntry, (void*)&S, leader_thread);
     }
-
-    pthread_t receive_from_master_thread;
-    CreateThread(ReceiveMessagesFromMaster, (void*)&S, receive_from_master_thread);
 
     void *status;
     pthread_join(accept_connections_thread, &status);

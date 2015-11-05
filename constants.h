@@ -16,6 +16,7 @@ const string kSendMessage = "sendMessage";
 const string kCrashServer = "crashServer";
 const string kRestartServer = "restartServer";
 const string kAllClear = "allClear";
+const string kAllClearRemove = "allClearRemove";
 const string kTimeBombLeader = "timeBombLeader";
 const string kPrintChatLog = "printChatLog";
 
