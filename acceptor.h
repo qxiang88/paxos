@@ -16,7 +16,7 @@ void *AcceptorEntry(void *_S);
 class Acceptor {
 public:
     bool ConnectToScout(const int server_id);
-    void GetCommanderFdSet(fd_set&, vector<int>&, int&);
+    void GetCommanderFdSet(fd_set&, int&);
     void AddToCommanderFDSet(const int fd);
     void RemoveFromCommanderFDSet(const int fd);
     void SendBackOwnFD(const int fd);

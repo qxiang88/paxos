@@ -6,6 +6,10 @@
 #include "iostream"
 using namespace std;
 
+typedef enum {
+    DEAD, RUNNING, RECOVER
+} Status;
+
 class Master {
 public:
     bool ReadPortsFile();
@@ -41,21 +45,22 @@ public:
     int get_primary_id();
     int get_num_servers();
     std::vector<int> get_server_fd_set();
-
-
+    Status get_server_status(const int server_id);
 
     void set_server_pid(const int server_id, const int pid);
     void set_client_pid(const int client_id, const int pid);
     void set_server_fd(const int server_id, const int fd);
     void set_client_fd(const int client_id, const int fd);
     void set_primary_id(const int primary_id);
+    void set_server_status(const int server_id, const Status s);
 
 private:
     int num_servers_;
     int num_clients_;
     int primary_id_;
 
-    // std::vector<ofstream> fout_;
+    ofstream* fout_;
+    std::vector<Status> server_status_;
 
     std::vector<int> server_pid_;
     std::vector<int> client_pid_;

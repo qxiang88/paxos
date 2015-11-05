@@ -78,13 +78,12 @@ void Acceptor::set_best_ballot_num(const Ballot &b) {
  * @param cfds_vec [out] vector correponding to the constructed fd_set
  * @param fd_max   [out] maximum value of fd in the constructed fd_set
  */
- void Acceptor::GetCommanderFdSet(fd_set& cfds_set, vector<int>& cfds_vec, int& fd_max)
+ void Acceptor::GetCommanderFdSet(fd_set& cfds_set, int& fd_max)
  {
     int fd_temp;
     fd_max = INT_MIN;
     set<int> local_set = get_commander_fd_set();
     FD_ZERO(&cfds_set);
-    cfds_vec.clear();
     for (auto it = local_set.begin(); it != local_set.end(); it++)
     {
         fd_temp = *it;
@@ -92,7 +91,6 @@ void Acceptor::set_best_ballot_num(const Ballot &b) {
         {
             FD_SET(fd_temp, &cfds_set);
             fd_max = max(fd_max, fd_temp);
-            cfds_vec.push_back(fd_temp);
         }
     }
 }
@@ -168,22 +166,20 @@ void Acceptor::Unicast(const string &type, const string& msg, int r_fd)
     int num_bytes;
 
     fd_set recv_from;
-    vector<int> fds;
 
     while (true) {  // always listen to messages from the acceptors
 
-        int fd_max, fd_temp;
-        GetCommanderFdSet(recv_from, fds, fd_max);
+        int fd_max = INT_MIN, fd_temp;
+        GetCommanderFdSet(recv_from, fd_max);
         int primary_id = S->get_primary_id();
         fd_temp = get_scout_fd(primary_id);
         if (fd_temp != -1)
         {
-            fds.push_back(fd_temp);
             FD_SET(fd_temp, &recv_from);
             fd_max = max(fd_max, fd_temp);
         }
 
-        if (fds.empty()) {
+        if (fd_max == INT_MIN) {
             usleep(kBusyWaitSleep);
             continue;
         }
@@ -196,24 +192,24 @@ void Acceptor::Unicast(const string &type, const string& msg, int r_fd)
         } else if (rv == 0) {
             // D(cout << "SA" << S->get_pid() << ": Unexpected select timeout in Acceptor" << endl;)
         } else {
-            for (int i = 0; i < fds.size(); i++) {
-                if (FD_ISSET(fds[i], &recv_from)) { // we got one!!
+            for (int i = 0; i <= fd_max; i++) {
+                if (FD_ISSET(i, &recv_from)) { // we got one!!
                     char buf[kMaxDataSize];
-                    if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1) {
+                    if ((num_bytes = recv(i, buf, kMaxDataSize - 1, 0)) == -1) {
                         D(cout << "SA" << S->get_pid() << ": ERROR in receiving from scout or commander" << endl;)
-                        if (i != fds.size() - 1) {
-                            RemoveFromCommanderFDSet(fds[i]);
-                        } else { // scout fd
-                            close(fds[i]);
+                        if (i == get_scout_fd(primary_id)) {
+                            close(i);
                             set_scout_fd(primary_id, -1);
+                        } else { // scout fd
+                            RemoveFromCommanderFDSet(i);
                         }
                     } else if (num_bytes == 0) {     //connection closed
                         D(cout << "SA" << S->get_pid() << ": Connection closed by scout or commander." << endl;)
-                        if (i != fds.size() - 1) {
-                            RemoveFromCommanderFDSet(fds[i]);
-                        } else { // scout fd
-                            close(fds[i]);
+                        if (i == get_scout_fd(primary_id)) {
+                            close(i);
                             set_scout_fd(primary_id, -1);
+                        } else { // scout fd
+                            RemoveFromCommanderFDSet(i);
                         }
                     } else {
                         buf[num_bytes] = '\0';

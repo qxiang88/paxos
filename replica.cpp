@@ -189,9 +189,9 @@ void Replica::ProposeBuffered()
 {
   for(auto pit = buffered_proposals_.begin(); pit!=buffered_proposals_.end(); pit++)
   {
-     Propose(*pit);
- }
- buffered_proposals_.clear();
+   Propose(*pit);
+}
+buffered_proposals_.clear();
 }
 
 void Replica::CheckReceivedAllDecisions(map<int, Proposal>& allDecisions)
@@ -199,14 +199,14 @@ void Replica::CheckReceivedAllDecisions(map<int, Proposal>& allDecisions)
   if (map_compare (allDecisions,decisions_))
   {
  		// D(cout<<"SR"<<S->get_pid()<<": Has received every decision in all decisions("<<allDecisions.size()<<")"<<endl;)
-     S->set_all_clear(kReplicaRole, kAllClearDone);
-     allDecisions.clear();
-     allDecisions[-1] = Proposal("","","");
- }
- else
- {
+   S->set_all_clear(kReplicaRole, kAllClearDone);
+   allDecisions.clear();
+   allDecisions[-1] = Proposal("","","");
+}
+else
+{
                 // D(cout<<"SR"<<S->get_pid()<<": Has not received every decision"<<endl;)
- }
+}
 }
 
 void Replica::CreateFdSet(fd_set& fromset, vector<int> &fds, int& fd_max)
@@ -217,19 +217,19 @@ void Replica::CreateFdSet(fd_set& fromset, vector<int> &fds, int& fd_max)
   fds.clear();
   for (int i = 0; i < S->get_num_clients(); i++)
   {
-     fd_temp = get_client_chat_fd(i);
-     if(fd_temp == -1)
-        continue;
+   fd_temp = get_client_chat_fd(i);
+   if(fd_temp == -1)
+    continue;
 
-    fd_max = max(fd_max, fd_temp);
-    fds.push_back(fd_temp);
-    FD_SET(fd_temp, &fromset);
+fd_max = max(fd_max, fd_temp);
+fds.push_back(fd_temp);
+FD_SET(fd_temp, &fromset);
 }
 
 for (int i = 0; i < S->get_num_servers(); i++)
 {
- fd_temp = get_commander_fd(i);
- if(fd_temp == -1)
+   fd_temp = get_commander_fd(i);
+   if(fd_temp == -1)
     continue;
 
 fd_max = max(fd_max, fd_temp);
@@ -251,10 +251,6 @@ FD_SET(fd_temp, &fromset);
  */
  void Replica::ReplicaMode()
  {
-
-
-
-
  	char buf[kMaxDataSize];
  	int num_bytes;
 
@@ -264,31 +260,27 @@ FD_SET(fd_temp, &fromset);
 
  	map<int, Proposal> allDecs;
  	allDecs[-1] = Proposal("","","");
-
     while (true) {  // always listen to messages from the acceptors
-
     	CreateFdSet(fromset, fds, fd_max);
         //if just become not set, then propose buffered
     	if((S->get_all_clear(kReplicaRole)==kAllClearNotSet)&&(!buffered_proposals_.empty()))
     		ProposeBuffered();
-
     	if((S->get_all_clear(kReplicaRole)==kAllClearSet)&&(allDecs.find(-1)==allDecs.end()) )
     	{
     		CheckReceivedAllDecisions(allDecs);
     	}
-
     	int rv = select(fd_max + 1, &fromset, NULL, NULL, (timeval*)&kSelectTimeoutTimeval);
         if (rv == -1) { //error in select
         	D(cout << "SR" << S->get_pid() << ": ERROR in select()" << endl;)
         } else if (rv == 0) {
             // D(cout << "SR" << S->get_pid() << ": ERROR Unexpected select timeout" << endl;)
         } else {
-        	for (int i = 0; i < fds.size(); i++) {
-                if (FD_ISSET(fds[i], &fromset)) { // we got one!!
-                	char buf[kMaxDataSize];
-                	if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1) {
-                		D(cout << "SR" << S->get_pid()
-                			<< ": ERROR in receiving from commander or clients" << endl;)
+            for (int i = 0; i <= fd_max; i++) {
+                if (FD_ISSET(i, &fromset)) { // we got one!!
+                    char buf[kMaxDataSize];
+                    if ((num_bytes = recv(i, buf, kMaxDataSize - 1, 0)) == -1) {
+                        D(cout << "SR" << S->get_pid()
+                          << ": ERROR in receiving from commander or clients" << endl;)
                     } else if (num_bytes == 0) {     //connection closed
                     	D(cout << "SR" << S->get_pid() << ": Connection closed by commander or client" << endl;)
                     } else {

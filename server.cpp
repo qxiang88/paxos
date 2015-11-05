@@ -312,7 +312,7 @@ void Server::set_all_clear(string role, string status)
 
 void Server::AllClearPhase()
 {
-    // sleep(2); //for testing allclear
+    sleep(2); //for testing allclear
     set_all_clear(kReplicaRole, kAllClearSet);  
     
     if(get_pid()==get_primary_id())
