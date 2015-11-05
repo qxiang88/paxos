@@ -25,8 +25,11 @@ public:
     void ExtractChatMessage(const string &command, string &message);
     void ConstructChatMessage(const string &chat_message, string &message);
     void SendMessageToClient(const int client_id, const string &message);
+    void SendMessageToServer(const int server_id, const string &message);
     void ReceiveChatLogFromClient(const int client_id, string &chat_log);
     void PrintChatLog(const int client_id, const string &chat_log);
+    void ElectNewLeader();
+    void TimeBombLeader(const int num_messages);
 
     int get_server_fd(const int server_id);
     int get_client_fd(const int client_id);
@@ -37,6 +40,10 @@ public:
     int get_client_pid(const int client_id);
     int get_primary_id();
     Status get_server_status(const int server_id);
+    void NewPrimaryElection();
+    void ElectNewPrimary();
+    void InformClientsAboutNewPrimary();
+    void InformServersAboutNewPrimary();
 
     void set_server_pid(const int server_id, const int pid);
     void set_client_pid(const int client_id, const int pid);

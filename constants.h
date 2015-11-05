@@ -31,6 +31,9 @@ const string kInternalStructDelim = ".";
 const string kInternalSetDelim = ",";
 const string kChat = "CHAT";
 const string kChatLog = "CHATLOG";
+const string kNewPrimary = "NEWPRIMARY";
+const string kTimeBomb = "TIMEBOMB";
+const string kSuicide = "SUICIDE";
 
 
 const string kP1a = "P1A";

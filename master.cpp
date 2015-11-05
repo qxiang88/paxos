@@ -185,12 +185,9 @@ void Master::ReadTest() {
             int server_id;
             iss >> server_id;
 
-            if (server_id != get_primary_id()) {
-                CrashServer(server_id);
-            } else {
-
-            }
-
+            CrashServer(server_id);
+            if (server_id == get_primary_id())
+                NewPrimaryElection();
         }
         if (keyword == kRestartServer) {
 
@@ -199,7 +196,11 @@ void Master::ReadTest() {
 
         }
         if (keyword == kTimeBombLeader) {
-
+            int num_messages;
+            iss >> num_messages;
+            TimeBombLeader(num_messages);
+            usleep(kGeneralSleep);
+            usleep(kGeneralSleep);
         }
         if (keyword == kPrintChatLog) {
             // usleep(5000 * 1000);
@@ -215,11 +216,92 @@ void Master::ReadTest() {
 }
 
 /**
+ * sends timebomb message to primary and waits for suicide message
+ * on receiving suicide from primary, it kills primary and elects new primary
+ * @param num_messages primary's alloted quota of messages
+ */
+void Master::TimeBombLeader(const int num_messages) {
+    int primary_id = get_primary_id();
+    string msg = kTimeBomb + to_string(num_messages) + kMessageDelim;
+    SendMessageToServer(primary_id, msg);
+
+    char buf[kMaxDataSize];
+    int num_bytes;
+    num_bytes = recv(get_server_fd(primary_id), buf, kMaxDataSize - 1, 0);
+    if (num_bytes == -1) {
+        D(cout << "M  : ERROR in receiving Suicide message from primary S" << primary_id << endl;)
+    } else if (num_bytes == 0) {    // connection closed by master
+        D(cout << "M  : Connection closed by primary S" << primary_id << endl;)
+    } else {
+        buf[num_bytes] = '\0';
+        std::vector<string> msg = split(string(buf), kMessageDelim[0]);
+        for (auto &m : msg) {
+            if (m == kSuicide) {
+                CrashServer(primary_id);
+                NewPrimaryElection();
+            } else {
+                D(cout << "M  : ERROR Unexpected message received from primary S"
+                  << primary_id << ": " << m << endl;)
+            }
+        }
+    }
+}
+/**
+ * performs all tasks related to new primary election
+ * and informing servers and clients about the new primary
+ */
+void Master::NewPrimaryElection() {
+    ElectNewPrimary();
+    InformServersAboutNewPrimary();
+    usleep(kGeneralSleep);
+    usleep(kGeneralSleep);
+    InformClientsAboutNewPrimary();
+}
+
+/**
+ * elects a new primary among the set of running servers using round robin
+ */
+void Master::ElectNewPrimary() {
+    int curr_primary = get_primary_id();
+    int i = (curr_primary + 1) % num_servers_;
+    while (true) {
+        if (server_status_[i] != DEAD) {
+            set_primary_id(i);
+            D(cout << "M  : New primary elected: S" << i << endl;)
+            break;
+        }
+        i = (i + 1) % num_servers_;
+    }
+}
+
+/**
+ * sends id of new primary to each client
+ */
+void Master::InformClientsAboutNewPrimary() {
+    string msg = kNewPrimary + to_string(get_primary_id()) + kMessageDelim;
+    for (int i = 0; i < num_clients_; ++i) {
+        SendMessageToClient(i, msg);
+    }
+}
+
+/**
+ * sends id of new primary to each client
+ */
+void Master::InformServersAboutNewPrimary() {
+    string msg = kNewPrimary + to_string(get_primary_id()) + kMessageDelim;
+    for (int i = 0; i < num_clients_; ++i) {
+        if (server_status_[i] != DEAD) {
+            SendMessageToServer(i, msg);
+        }
+    }
+}
+
+/**
  * receives chatlog from a client
  * @param client_id id of client from which chatlog is to be received
  * @param chat_log  [out] chatlog received in concatenated string form
  */
-void Master::ReceiveChatLogFromClient(const int client_id, string &chat_log) {
+void Master::ReceiveChatLogFromClient(const int client_id, string & chat_log) {
     char buf[kMaxDataSize];
     int num_bytes;
     num_bytes = recv(get_client_fd(client_id), buf, kMaxDataSize - 1, 0);
@@ -239,7 +321,7 @@ void Master::ReceiveChatLogFromClient(const int client_id, string &chat_log) {
  * prints chat log received from a client in the expected format
  * @param chat_log chat log in concatenated string format
  */
-void Master::PrintChatLog(const int client_id, const string &chat_log) {
+void Master::PrintChatLog(const int client_id, const string & chat_log) {
     std::vector<string> chat = split(chat_log, kMessageDelim[0]);
     for (auto &c : chat) {
         std::vector<string> token = split(c, kInternalDelim[0]);
@@ -381,7 +463,7 @@ void Master::CrashServer(const int server_id) {
         set_server_pid(server_id, -1);
         set_server_fd(server_id, -1);
         set_server_status(server_id, DEAD);
-        D(cout << "M  : Server S" << server_id<<" killed" << endl;)
+        D(cout << "M  : Server S" << server_id << " killed" << endl;)
     }
 }
 
@@ -423,11 +505,24 @@ void Master::KillAllClients() {
  * @param client_id id of client to which message needs to be sent
  * @param message   message to be sent
  */
-void Master::SendMessageToClient(const int client_id, const string &message) {
+void Master::SendMessageToClient(const int client_id, const string & message) {
     if (send(get_client_fd(client_id), message.c_str(), message.size(), 0) == -1) {
         D(cout << "M  : ERROR: Cannot send message to client C" << client_id << endl;)
     } else {
         D(cout << "M  : Message sent to client C" << client_id << ": " << message << endl;)
+    }
+}
+
+/**
+ * sends message to a server
+ * @param server_id id of server to which message needs to be sent
+ * @param message   message to be sent
+ */
+void Master::SendMessageToServer(const int server_id, const string & message) {
+    if (send(get_server_fd(server_id), message.c_str(), message.size(), 0) == -1) {
+        D(cout << "M  : ERROR: Cannot send message to server S" << server_id << endl;)
+    } else {
+        D(cout << "M  : Message sent to server S" << server_id << ": " << message << endl;)
     }
 }
 

@@ -157,11 +157,30 @@ void Client::SendChatToPrimary(const int chat_id, const string &chat_message) {
 }
 
 /**
+ * sends all chats which have not yet been decided to the (new) primary
+ */
+void Client::ResendChats() {
+    for (int i = 0; i < chat_list_.size(); ++i) {
+        if(decided_chat_ids_.find(i) == decided_chat_ids_.end()) {
+            SendChatToPrimary(i, chat_list_[i]);
+        }
+    }
+}
+
+/**
  * adds a new chat to the chat list
  * @param chat new chat to be added to the list
  */
 void Client::AddChatToChatList(const string &chat) {
     chat_list_.push_back(chat);
+}
+
+/**
+ * adds a decided chat id to the decided_chat_ids list
+ * @param chat_id chat id to be added
+ */
+void Client::AddToDecidedChatIDs(const int chat_id) {
+    decided_chat_ids_.insert(chat_id);
 }
 
 /**
@@ -253,14 +272,22 @@ void* ReceiveMessagesFromMaster(void* _C) {
             for (const auto &msg : message) {
                 std::vector<string> token = split(string(msg), kInternalDelim[0]);
                 if (token[0] == kChat) {   // new chat message received from master
-                    D(cout << "C" << C->get_pid() << " : Chat message received from M: " << token[1] <<  endl;)
+                    D(cout << "C" << C->get_pid()
+                      << " : Chat message received from M: " << token[1] <<  endl;)
                     C->AddChatToChatList(token[1]);
                     C->SendChatToPrimary(C->ChatListSize() - 1, token[1]);
                 } else if (token[0] == kChatLog) {  // chat log request from master
-                    D(cout << "C" << C->get_pid() << " : ChatLog request received from M: " <<  endl;)
+                    D(cout << "C" << C->get_pid() << " : ChatLog request received from M" <<  endl;)
                     C->SendChatLogToMaster();
+                } else if (token[0] == kNewPrimary) {
+                    int new_primary = stoi(token[1]);
+                    D(cout << "C" << C->get_pid()
+                      << " : New primary id received from M: " << new_primary <<  endl;)
+                    C->set_primary_id(new_primary);
+                    C->ResendChats();
                 } else {    //other messages
-
+                    D(cout << "C" << C->get_pid()
+                      << " : ERROR Unexpected message received from M" <<  endl;)
                 }
             }
         }
@@ -314,6 +341,7 @@ void* ReceiveMessagesFromPrimary(void* _C) {
                     // proposal_token[1] = (chat id) wrt to original sender of chat message
                     // proposal_token[2] = (msg) chat message body
                     C->AddToFinalChatLog(token[1], proposal_token[1], proposal_token[2]);
+                    C->AddToDecidedChatIDs(stoi(token[1]));
                 } else {
                     D(cout << "C" << C->get_pid() << " : Unexpected message received: " << msg << endl;)
 
