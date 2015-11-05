@@ -33,7 +33,6 @@ void stringToDecision(const string& dec, int& s, Proposal& p);
 void stringToDecisionForAll(const string& dec, int& s, Proposal& p);
 string decisionToStringForAll(const int& s, const Proposal& p);
 
-
 void union_set(unordered_set<Triple>& s1, unordered_set<Triple>&s2);
 map<int, Proposal> pmax(const unordered_set<Triple> &pvalues);
 map<int, Proposal> pairxor(const map<int, Proposal> &x,const map<int, Proposal> &y);

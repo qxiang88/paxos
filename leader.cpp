@@ -132,54 +132,6 @@ void Leader::SendReplicasAllDecisions()
         }
     }
 }
-
-/**
- * thread entry function for leader
- * @param  _S pointer to server class object
- * @return    NULL
- */
- void* LeaderEntry(void *_S) {
-    Leader L((Server*)_S);
-
-    // does not need accept threads since it does not listen to connections from anyone
-
-    // sleep for some time to make sure accept threads of commanders,scouts,replica are running
-    usleep(kGeneralSleep);
-    usleep(kGeneralSleep);
-    int primary_id = L.S->get_primary_id();
-    if (L.ConnectToCommander(primary_id)) {
-        // D(cout << "SL" << L.S->get_pid() << ": Connected to commander of S"
-          // << primary_id << endl;)
-    } else {
-        D(cout << "SL" << L.S->get_pid() << ": ERROR in connecting to commander of S"
-          << primary_id << endl;)
-        return NULL;
-    }
-
-    if (L.ConnectToScout(primary_id)) {
-        // D(cout << "SL" << L.S->get_pid() << ": Connected to scout of S"
-        //   << primary_id << endl;)
-    } else {
-        D(cout << "SL" << L.S->get_pid() << ": ERROR in connecting to scout of S"
-          << primary_id << endl;)
-        return NULL;
-    }
-    for(int i=0; i<L.S->get_num_servers(); i++)
-    {
-        if (L.ConnectToReplica(i)) { // same as R.S->get_pid()
-            // D(cout << "SL" << L.S->get_pid() << ": Connected to replica of S"
-            //   << i << endl;)
-        } else {
-            D(cout << "SL" << L.S->get_pid() << ": ERROR in connecting to replica of S"
-              << i << endl;)
-            return NULL;
-        }
-    }
-
-    L.LeaderMode();
-    return NULL;
-}
-
 /**
  * function for performing leader related job
  */
@@ -325,4 +277,51 @@ void Leader::SendReplicasAllDecisions()
             S->set_all_clear(kLeaderRole, kAllClearDone);
         }
     }
+}
+
+/**
+ * thread entry function for leader
+ * @param  _S pointer to server class object
+ * @return    NULL
+ */
+ void* LeaderEntry(void *_S) {
+    Leader L((Server*)_S);
+
+    // does not need accept threads since it does not listen to connections from anyone
+
+    // sleep for some time to make sure accept threads of commanders,scouts,replica are running
+    usleep(kGeneralSleep);
+    usleep(kGeneralSleep);
+    int primary_id = L.S->get_primary_id();
+    if (L.ConnectToCommander(primary_id)) {
+        // D(cout << "SL" << L.S->get_pid() << ": Connected to commander of S"
+          // << primary_id << endl;)
+    } else {
+        D(cout << "SL" << L.S->get_pid() << ": ERROR in connecting to commander of S"
+          << primary_id << endl;)
+        return NULL;
+    }
+
+    if (L.ConnectToScout(primary_id)) {
+        // D(cout << "SL" << L.S->get_pid() << ": Connected to scout of S"
+        //   << primary_id << endl;)
+    } else {
+        D(cout << "SL" << L.S->get_pid() << ": ERROR in connecting to scout of S"
+          << primary_id << endl;)
+        return NULL;
+    }
+    for(int i=0; i<L.S->get_num_servers(); i++)
+    {
+        if (L.ConnectToReplica(i)) { // same as R.S->get_pid()
+            // D(cout << "SL" << L.S->get_pid() << ": Connected to replica of S"
+            //   << i << endl;)
+        } else {
+            D(cout << "SL" << L.S->get_pid() << ": ERROR in connecting to replica of S"
+              << i << endl;)
+            return NULL;
+        }
+    }
+
+    L.LeaderMode();
+    return NULL;
 }

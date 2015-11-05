@@ -193,7 +193,7 @@ void Master::set_server_status(const int server_id, const Status s) {
         if (keyword == kCrashServer) {
             int server_id;
             iss >> server_id;
-
+            D(cout<<"M : Crasing server"<<server_id<<endl;)
             if (server_id != get_primary_id()) {
                 CrashServer(server_id);
             } else {
@@ -235,15 +235,13 @@ void Master::ConstructAllClearMessage(string &message, const string& type) {
 
 void Master::WaitForAllClearDone()
 {
-
     fd_set server_set;
     int fd_max, num_bytes;
-    vector<int> fd_vec;
     int num_servers = get_num_servers();
     int waitfor = num_servers;
 
     while (waitfor) {  // always listen to messages from the acceptors
-        GetServerFdSet(server_set, fd_vec, fd_max);
+        GetServerFdSet(server_set, fd_max);
         int rv = select(fd_max + 1, &server_set, NULL, NULL, NULL);
 
         if (rv == -1) { //error in select
@@ -251,14 +249,20 @@ void Master::WaitForAllClearDone()
         } else if (rv == 0) {
             D(cout << "M: ERROR: Unexpected timeout in select() while waiting for all clear" << endl;)
         } else {
-            for (int i = 0; i < num_servers; i++) {
-                if (FD_ISSET(fd_vec[i], &server_set)) { // we got one!!
+            for (int i = 0; i <= fd_max; i++) {
+                if (FD_ISSET(i, &server_set)) { // we got one!!
                     char buf[kMaxDataSize];
-                    if ((num_bytes = recv(fd_vec[i], buf, kMaxDataSize - 1, 0)) == -1) {
+                    if ((num_bytes = recv(i, buf, kMaxDataSize - 1, 0)) == -1) {
                         D(cout << "M: ERROR in receiving all clear domr from server S" << i << endl;)
+                        close(i);
+                        set_server_fd(GetServerIdWithFd(i), -1);
+                        waitfor--;
                     } 
                     else if (num_bytes == 0) 
                     {     //connection closed
+                        close(i);
+                        set_server_fd(GetServerIdWithFd(i), -1);
+                        waitfor--;
                         // D(cout << "M: ERROR Connection closed by server S" << i << endl;)
                     } 
                     else 
@@ -297,13 +301,12 @@ void Master::SendAllClearToServers(const string& type)
     D(cout << "M  : " << type << " sent to all servers" << endl;)
 }
 
-void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, int& fd_max)
+void Master::GetServerFdSet(fd_set& server_fd_set, int& fd_max)
 {
     int fd_temp;
     fd_max = INT_MIN;
     vector<int> local_set = get_server_fd_set();
     FD_ZERO(&server_fd_set);
-    server_fd_vec.clear();
     for (auto it = local_set.begin(); it != local_set.end(); it++)
     {
         fd_temp = *it;
@@ -311,11 +314,19 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
         {
             FD_SET(fd_temp, &server_fd_set);
             fd_max = max(fd_max, fd_temp);
-            server_fd_vec.push_back(fd_temp);
         }
     }
 }
 
+int Master::GetServerIdWithFd(int fd)
+{
+    vector<int> local = get_server_fd_set();
+    for(int i=0; i<local.size(); i++)
+    {
+        if(local[i]==fd) return i;    
+    }
+    return -1;
+}
 /**
  * receives chatlog from a client
  * @param client_id id of client from which chatlog is to be received
@@ -383,21 +394,30 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
         char server_id_arg[10];
         char num_servers_arg[10];
         char num_clients_arg[10];
+        char mode_arg[10];
         sprintf(server_id_arg, "%d", i);
         sprintf(num_servers_arg, "%d", num_servers_);
         sprintf(num_clients_arg, "%d", num_clients_);
+
+        //for testing
+        if(i==1)
+            sprintf(mode_arg, "%d", 2);
+        else
+            sprintf(mode_arg, "%d", 1);
+
         char *argv[] = {(char*)kServerExecutable.c_str(),
             server_id_arg,
             num_servers_arg,
             num_clients_arg,
+            mode_arg,
             NULL
         };
         status = posix_spawn(&pid,
-         (char*)kServerExecutable.c_str(),
-         NULL,
-         NULL,
-         argv,
-         environ);
+           (char*)kServerExecutable.c_str(),
+           NULL,
+           NULL,
+           argv,
+           environ);
         if (status == 0) {
             // D(cout << "M  : Spawed server S" << i << endl;)
             set_server_pid(i, pid);
@@ -443,11 +463,11 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
             NULL
         };
         status = posix_spawn(&pid,
-         (char*)kClientExecutable.c_str(),
-         NULL,
-         NULL,
-         argv,
-         environ);
+           (char*)kClientExecutable.c_str(),
+           NULL,
+           NULL,
+           argv,
+           environ);
         if (status == 0) {
             // D(cout << "M  : Spawed client C" << i << endl;)
             set_client_pid(i, pid);

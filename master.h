@@ -30,9 +30,9 @@ public:
     void PrintChatLog(const int client_id, const string &chat_log);
     void SendAllClearToServers(const string&);
     void WaitForAllClearDone();
-    void GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, int& fd_max);
+    void GetServerFdSet(fd_set& server_fd_set, int& fd_max);
     void ConstructAllClearMessage(string &message, const string& type);
-
+    int GetServerIdWithFd(int);
 
 
     int get_server_fd(const int server_id);

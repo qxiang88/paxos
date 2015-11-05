@@ -15,14 +15,15 @@
 using namespace std;
 
 typedef pair<int, Proposal> SPtuple;
-
+pthread_mutex_t decisions_lock;
 template <typename Map>
 bool map_compare (Map const &lhs, Map const &rhs) {
     // No predicate needed because there is operator== for pairs already.
-	return lhs.size() == rhs.size()
-	&& std::equal(lhs.begin(), lhs.end(),
-		rhs.begin());
+    return lhs.size() == rhs.size()
+    && std::equal(lhs.begin(), lhs.end(),
+        rhs.begin());
 }
+
 
 #define DEBUG
 
@@ -43,7 +44,13 @@ Replica::Replica(Server* _S) {
 	commander_fd_.resize(num_servers, -1);
 	scout_fd_.resize(num_servers, -1);
 	leader_fd_.resize(num_servers, -1);
-	client_chat_fd_.resize(num_clients, -1);
+    client_chat_fd_.resize(num_clients, -1);
+    replica_fd_.resize(num_servers, -1);
+
+    recovery_ = false;
+    if (pthread_mutex_init(&decisions_lock, NULL) != 0) {
+        D(cout << "SR" << S->get_pid() << ": Mutex init failed" << endl;)
+    }
 }
 
 int Replica::get_commander_fd(const int server_id) {
@@ -55,7 +62,11 @@ int Replica::get_scout_fd(const int server_id) {
 }
 
 int Replica::get_leader_fd(const int server_id) {
-	return leader_fd_[server_id];
+    return leader_fd_[server_id];
+}
+
+int Replica::get_replica_fd(const int server_id) {
+	return replica_fd_[server_id];
 }
 
 int Replica::get_client_chat_fd(const int client_id) {
@@ -63,7 +74,20 @@ int Replica::get_client_chat_fd(const int client_id) {
 }
 
 int Replica::get_slot_num() {
-	return slot_num_;
+    return slot_num_;
+}
+map<int,Proposal> Replica::get_decisions() {
+    map<int, Proposal> d;
+    pthread_mutex_lock(&decisions_lock);
+    d = decisions_;
+    pthread_mutex_unlock(&decisions_lock);
+    return d;
+}
+
+void Replica::set_decisions(map<int, Proposal>& d){
+    pthread_mutex_lock(&decisions_lock);
+    decisions_ = d;
+    pthread_mutex_unlock(&decisions_lock);
 }
 
 void Replica::set_commander_fd(const int server_id, const int fd) {
@@ -75,7 +99,10 @@ void Replica::set_scout_fd(const int server_id, const int fd) {
 }
 
 void Replica::set_leader_fd(const int server_id, const int fd) {
-	leader_fd_[server_id] = fd;
+    leader_fd_[server_id] = fd;
+}
+void Replica::set_replica_fd(const int server_id, const int fd) {
+	replica_fd_[server_id] = fd;
 }
 
 void Replica::set_client_chat_fd(const int client_id, const int fd) {
@@ -187,61 +214,57 @@ void Replica::Unicast(const string &type, const string& msg)
 
 void Replica::ProposeBuffered()
 {
-  for(auto pit = buffered_proposals_.begin(); pit!=buffered_proposals_.end(); pit++)
-  {
-   Propose(*pit);
-}
-buffered_proposals_.clear();
+    for(auto pit = buffered_proposals_.begin(); pit!=buffered_proposals_.end(); pit++)
+    {
+        Propose(*pit);
+    }
+    buffered_proposals_.clear();
 }
 
 void Replica::CheckReceivedAllDecisions(map<int, Proposal>& allDecisions)
 {    
-  if (map_compare (allDecisions,decisions_))
-  {
+    if (map_compare (allDecisions,decisions_))
+    {
  		// D(cout<<"SR"<<S->get_pid()<<": Has received every decision in all decisions("<<allDecisions.size()<<")"<<endl;)
-   S->set_all_clear(kReplicaRole, kAllClearDone);
-   allDecisions.clear();
-   allDecisions[-1] = Proposal("","","");
-}
-else
-{
-                // D(cout<<"SR"<<S->get_pid()<<": Has not received every decision"<<endl;)
-}
+        S->set_all_clear(kReplicaRole, kAllClearDone);
+        allDecisions.clear();
+        allDecisions[-1] = Proposal("","","");
+    }
 }
 
 void Replica::CreateFdSet(fd_set& fromset, vector<int> &fds, int& fd_max)
 {
-  fd_max = INT_MIN;
-  int fd_temp;
-  FD_ZERO(&fromset);
-  fds.clear();
-  for (int i = 0; i < S->get_num_clients(); i++)
-  {
-   fd_temp = get_client_chat_fd(i);
-   if(fd_temp == -1)
-    continue;
+    fd_max = INT_MIN;
+    int fd_temp;
+    FD_ZERO(&fromset);
+    fds.clear();
+    for (int i = 0; i < S->get_num_clients(); i++)
+    {
+        fd_temp = get_client_chat_fd(i);
+        if(fd_temp == -1)
+            continue;
 
-fd_max = max(fd_max, fd_temp);
-fds.push_back(fd_temp);
-FD_SET(fd_temp, &fromset);
-}
+        fd_max = max(fd_max, fd_temp);
+        fds.push_back(fd_temp);
+        FD_SET(fd_temp, &fromset);
+    }
 
-for (int i = 0; i < S->get_num_servers(); i++)
-{
-   fd_temp = get_commander_fd(i);
-   if(fd_temp == -1)
-    continue;
+    for (int i = 0; i < S->get_num_servers(); i++)
+    {
+        fd_temp = get_commander_fd(i);
+        if(fd_temp == -1)
+            continue;
 
-fd_max = max(fd_max, fd_temp);
-fds.push_back(fd_temp);
-FD_SET(fd_temp, &fromset);
-}
+        fd_max = max(fd_max, fd_temp);
+        fds.push_back(fd_temp);
+        FD_SET(fd_temp, &fromset);
+    }
 
         //TODO: Use local primary_id from calling function or get_primary_id()?
-fd_temp = get_leader_fd(S->get_primary_id());
-fd_max = max(fd_max, fd_temp);
-fds.push_back(fd_temp);
-FD_SET(fd_temp, &fromset);
+    fd_temp = get_leader_fd(S->get_primary_id());
+    fd_max = max(fd_max, fd_temp);
+    fds.push_back(fd_temp);
+    FD_SET(fd_temp, &fromset);
 
 }
 
@@ -251,15 +274,15 @@ FD_SET(fd_temp, &fromset);
  */
  void Replica::ReplicaMode()
  {
- 	char buf[kMaxDataSize];
- 	int num_bytes;
+    char buf[kMaxDataSize];
+    int num_bytes;
 
- 	fd_set fromset;
- 	vector<int> fds;
- 	int fd_max;
+    fd_set fromset;
+    vector<int> fds;
+    int fd_max;
 
- 	map<int, Proposal> allDecs;
- 	allDecs[-1] = Proposal("","","");
+    map<int, Proposal> allDecs;
+    allDecs[-1] = Proposal("","","");
     while (true) {  // always listen to messages from the acceptors
     	CreateFdSet(fromset, fds, fd_max);
         //if just become not set, then propose buffered
@@ -350,6 +373,154 @@ FD_SET(fd_temp, &fromset);
     }
 }
 
+vector<int> Replica::get_replica_fd_set() {
+    return replica_fd_;
+}
+
+void Replica::GetReplicaFdSet(fd_set& replica_fd_set, int& fd_max)
+{
+    int fd_temp;
+    fd_max = INT_MIN;
+    vector<int> local_set = get_replica_fd_set();
+    FD_ZERO(&replica_fd_set);
+    for (auto it = local_set.begin(); it != local_set.end(); it++)
+    {
+        fd_temp = *it;
+        if (fd_temp != -1)
+        {
+            cout<<S->get_pid()<<" adding "<<fd_temp<<endl;
+            FD_SET(fd_temp, &replica_fd_set);
+            fd_max = max(fd_max, fd_temp);
+        }
+    }
+}
+
+
+int Replica::GetReplicaIdWithFd(int fd)
+{
+    vector<int> local = get_replica_fd_set();
+    for(int i=0; i<local.size(); i++)
+    {
+        if(local[i]==fd) return i;    
+    }
+    return -1;
+}
+void Replica::SendDecisionsRequest()
+{
+    string msg = kReqAllDecs + kMessageDelim;
+
+    for(int i=0; i<S->get_num_servers(); i++)
+    {
+        cout<<get_replica_fd(i)<<" sending"<<endl;
+        if (send(get_replica_fd(i), msg.c_str(), msg.size(), 0) == -1) {
+            D(cout << "SR" << S->get_pid() << ": ERROR: sending allDecs request to replica R"
+                << i << endl;)
+        }
+        else {
+            D(cout << "SR" << S->get_pid() << ": Message sent to replica R"
+              << i << ": " << msg << endl;)
+        }
+    }
+}
+void Replica::SendDecisionsResponse(int id)
+{
+    string msg = kAllDecisions + kInternalDelim;
+    msg += allDecisionsToString(get_decisions());
+    msg += kMessageDelim;
+    if (send(get_replica_fd(id), msg.c_str(), msg.size(), 0) == -1) {
+        D(cout << "SR" << S->get_pid() << ": ERROR: sending allDecs response to replica R"
+            << id << endl;)
+    }
+    else {
+        D(cout << "SR" << S->get_pid() << ": Message sent to replica R"
+          << id << ": " << msg << endl;)
+    }
+    
+}
+
+void Replica::MergeDecisions(map<int, Proposal> receivedAllDecisions)
+{
+    map<int, Proposal> local = get_decisions();
+    for(auto it=receivedAllDecisions.begin(); it!=receivedAllDecisions.end();it++)
+    {
+        //if recvd not in mine
+        if(local.find(it->first)==local.end())
+        {
+            local[it->first] = it->second;
+        }
+    }
+    set_decisions(local);
+}
+
+void Replica::DecisionsRecoveryMode()
+{
+    fd_set replica_set;
+    int fd_max, num_bytes;
+
+    int waitfor;
+    if(S->get_mode()==RECOVER){
+        SendDecisionsRequest();
+        waitfor = get_replica_fd_set().size();
+    }
+
+    while (true) {  // always listen to messages from the acceptors
+        GetReplicaFdSet(replica_set, fd_max);
+
+        int rv = select(fd_max + 1, &replica_set, NULL, NULL, NULL);
+        D(cout<<"SR"<<S->get_pid()<<": Select returned"<<endl;)
+
+        if (rv == -1) { //error in select
+            D(cout << "SR"<<S->get_pid()<<": ERROR in select() while receiving messages from replicas" << endl;)
+        } else if (rv == 0) {
+            D(cout << "SR"<<S->get_pid()<<": ERROR: Unexpected timeout in select() while receiving messages from replicas" << endl;)
+        } else {
+            for (int i = 0; i <= fd_max; i++) {
+                if (FD_ISSET(i, &replica_set)) { // we got one!!
+                    char buf[kMaxDataSize];
+                    if ((num_bytes = recv(i, buf, kMaxDataSize - 1, 0)) == -1) {
+                        int repl_id = GetReplicaIdWithFd(i);
+                        D(cout << "SR"<<S->get_pid()<<": ERROR in receiving messages from replicas" << repl_id << endl;)
+                        close(i);
+                        set_replica_fd(repl_id, -1);
+                        waitfor--;
+                    } else if (num_bytes == 0) {     //connection closed
+                        int repl_id = GetReplicaIdWithFd(i);
+                        D(cout << "SR"<<S->get_pid()<<": ERROR Connection closed by replica R" << repl_id << endl;)
+                        close(i);
+                        set_replica_fd(repl_id, -1);
+                        waitfor--;
+                    } else {
+                        buf[num_bytes] = '\0';
+                        std::vector<string> message = split(string(buf), kMessageDelim[0]);
+                        for (const auto &msg : message) {
+                            std::vector<string> token = split(string(msg), kInternalDelim[0]);
+                            if (token[0] == kReqAllDecs) {
+                                D(cout << "SR" << S->get_pid() << ": Request for all decisions message received: " << msg <<  endl;)
+                                SendDecisionsResponse(GetReplicaIdWithFd(i));
+                            } else if((token[0] == kAllDecisions) && (S->get_mode()==RECOVER)){
+                                D(cout << "SR" << S->get_pid() << ": All decisions response message received: " << msg <<  endl;)
+                                waitfor--;
+                                map<int, Proposal> receivedAllDecisions;
+                                stringToAllDecisions(token[1], receivedAllDecisions);
+                                MergeDecisions(receivedAllDecisions);
+                                if(!waitfor){
+                                    S->set_mode(RUNNING);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void* ReceiveMessagesFromReplicas(void* _R ){
+    Replica* R = (Replica*)_R;
+    R->DecisionsRecoveryMode(); //forever
+    return NULL;
+}
+
 /**
  * thread entry function for replica
  * @param  _S pointer to server class object
@@ -368,30 +539,49 @@ FD_SET(fd_temp, &fromset);
  	if (R.ConnectToCommander(primary_id)) {
         // D(cout << "SR" << R.S->get_pid() << ": Connected to commander of S"
         //   << primary_id << endl;)
- 	} else {
- 		D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to commander of S"
- 			<< primary_id << endl;)
- 		return NULL;
- 	}
+    } else {
+     D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to commander of S"
+        << primary_id << endl;)
+     return NULL;
+ }
 
- 	if (R.ConnectToScout(primary_id)) {
-        // D(cout << "SR" << R.S->get_pid() << ": Connected to scout of S"
-          // << primary_id << endl;)
- 	} else {
- 		D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to scout of S"
- 			<< primary_id << endl;)
- 		return NULL;
- 	}
+ if (R.ConnectToScout(primary_id)) {
+    // D(cout << "SR" << R.S->get_pid() << ": Connected to scout of S"
+    //   << primary_id << endl;)
+ } else {
+     D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to scout of S"
+        << primary_id << endl;)
+     return NULL;
+ }
+
+
+    //enuf to do this while recovering i guess
+ for(int i=0; i<R.S->get_num_servers(); i++)
+ {
+    if (R.ConnectToReplica(i)) { 
+        D(cout << "SR" << R.S->get_pid() << ": Connected to replica of S"
+          << i << endl;)
+    } else {
+        D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to replica of S"
+          << i << endl;)
+        return NULL;
+    }
+}
 
     // sleep for some time to make sure all connections are established
- 	usleep(kGeneralSleep);
- 	usleep(kGeneralSleep);
- 	usleep(kGeneralSleep);
+usleep(kGeneralSleep);
+usleep(kGeneralSleep);
+usleep(kGeneralSleep);
 
- 	R.ReplicaMode();
+pthread_t receive_from_replicas_thread;
+CreateThread(ReceiveMessagesFromReplicas, (void*)&R, receive_from_replicas_thread);
+// while(R.S->get_mode() != RUNNING)
+//     usleep(kRecoveryWaitSleep); 
 
- 	void *status;
- 	pthread_join(accept_connections_thread, &status);
- 	return NULL;
+R.ReplicaMode();
 
- }
+void *status;
+pthread_join(accept_connections_thread, &status);
+return NULL;
+
+}

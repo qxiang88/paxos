@@ -135,9 +135,9 @@ string ballotToString(const Ballot& b)
 
 string tripleSetToString(const unordered_set<Triple>& st)
 {
-   string rval;
-   for (auto it=st.begin(); it!=st.end(); it++)
-   {
+ string rval;
+ for (auto it=st.begin(); it!=st.end(); it++)
+ {
     if(it!=st.begin())
         rval += kInternalSetDelim;
     rval += tripleToString(*it);
@@ -305,6 +305,7 @@ map<int, Proposal> pairxor(const map<int, Proposal> &x,const map<int, Proposal> 
     }
     return rval;
 }
+
 
 /**
  * creates a new thread

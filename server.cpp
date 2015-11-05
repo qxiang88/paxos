@@ -14,6 +14,7 @@
 using namespace std;
 
 typedef pair<int, Proposal> SPtuple;
+pthread_mutex_t mode_lock;
 
 #define DEBUG
 
@@ -56,7 +57,13 @@ int Server::get_leader_port(const int server_id) {
 int Server::get_server_listen_port(const int server_id) {
     return server_listen_port_[server_id];
 }
-
+Status Server::get_mode(){
+    Status m;
+    pthread_mutex_lock(&mode_lock);
+    m = mode_;
+    pthread_mutex_unlock(&mode_lock);
+    return m;
+}
 int Server::get_client_listen_port(const int client_id) {
     return client_listen_port_[client_id];
 }
@@ -114,6 +121,12 @@ int Server::get_num_clients() {
 
 Scout* Server:: get_scout_object() {
     return scout_object_;
+}
+
+void Server::set_mode(Status m){
+    pthread_mutex_lock(&mode_lock);
+    mode_ = m;
+    pthread_mutex_unlock(&mode_lock);
 }
 
 void Server::set_pid(const int pid) {
@@ -268,11 +281,13 @@ void Server::set_all_clear(string role, string status)
  */
  void Server::Initialize(const int pid,
     const int num_servers,
-    const int num_clients) {
+    const int num_clients,
+    int mode) {
     set_pid(pid);
     set_primary_id(0);
     num_servers_ = num_servers;
     num_clients_ = num_clients;
+    mode_ = static_cast<Status>(mode);
 
     server_listen_port_.resize(num_servers_);
     client_listen_port_.resize(num_clients_);
@@ -378,10 +393,9 @@ void* ReceiveMessagesFromMaster(void* _S ){
     return NULL;
 }
 
-
 int main(int argc, char *argv[]) {
     Server S;
-    S.Initialize(atoi(argv[1]), atoi(argv[2]), atoi(argv[3]));
+    S.Initialize(atoi(argv[1]), atoi(argv[2]), atoi(argv[3]), atoi(argv[4]));
     if (!S.ReadPortsFile()) {
         return 1;
     }
