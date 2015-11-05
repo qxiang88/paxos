@@ -12,6 +12,7 @@
 #include "sys/types.h"
 #include "signal.h"
 #include "errno.h"
+#include "limits.h"
 #include "sys/socket.h"
 using namespace std;
 
@@ -55,6 +56,10 @@ int Master::get_client_pid(const int client_id) {
 
 int Master::get_primary_id() {
     return primary_id_;
+}
+
+int Master::get_num_servers() {
+    return num_servers_;
 }
 
 Status Master::get_server_status(const int server_id) {
@@ -170,6 +175,10 @@ void Master::ReadTest() {
             usleep(kGeneralSleep);
         }
         if (keyword == kSendMessage) {
+            // usleep(kGeneralSleep);
+            // usleep(kGeneralSleep);
+            // usleep(kGeneralSleep);
+
             int client_id;
             iss >> client_id;
             string chat_message;
@@ -177,23 +186,31 @@ void Master::ReadTest() {
             string message;
             ConstructChatMessage(chat_message, message);
             SendMessageToClient(client_id, message);
-            usleep(kGeneralSleep);
-            usleep(kGeneralSleep);
-            usleep(kGeneralSleep);
         }
         if (keyword == kCrashServer) {
+            // usleep(kGeneralSleep);
+            // usleep(kGeneralSleep);
+            // usleep(kGeneralSleep);
+
             int server_id;
             iss >> server_id;
-
             CrashServer(server_id);
             if (server_id == get_primary_id())
                 NewPrimaryElection();
+            usleep(kGeneralSleep);
+            usleep(kGeneralSleep);
         }
         if (keyword == kRestartServer) {
 
         }
         if (keyword == kAllClear) {
-
+            // D(cout<<endl<<endl<<"All Clear Message being sent"<<endl<<endl;)
+            SendAllClearToServers(kAllClear); //sends to primary server
+            WaitForAllClearDone();
+            SendAllClearToServers(kAllClearRemove); //sends to primary server
+            // cout<<"System is now in idle state. Enter any key to proceed"<<endl;
+            // string s;
+            // cin>>s;
         }
         if (keyword == kTimeBombLeader) {
             int num_messages;
@@ -203,7 +220,7 @@ void Master::ReadTest() {
             usleep(kGeneralSleep);
         }
         if (keyword == kPrintChatLog) {
-            // usleep(5000 * 1000);
+            usleep(5000 * 1000);
             int client_id;
             iss >> client_id;
             string message = kChatLog + kInternalDelim;
@@ -211,6 +228,94 @@ void Master::ReadTest() {
             string chat_log;
             ReceiveChatLogFromClient(client_id, chat_log);
             PrintChatLog(client_id, chat_log);
+        }
+    }
+}
+
+void Master::ConstructAllClearMessage(string &message, const string& type) {
+    message = type + kMessageDelim;
+}
+
+void Master::WaitForAllClearDone()
+{
+
+    fd_set server_set;
+    int fd_max, num_bytes;
+    int num_servers = get_num_servers();
+    int waitfor = num_servers;
+    std::vector<int> fds;
+
+    while (waitfor) {  // always listen to messages from the acceptors
+        GetServerFdSet(server_set, fds, fd_max);
+        int rv = select(fd_max + 1, &server_set, NULL, NULL, NULL);
+
+        if (rv == -1) { //error in select
+            D(cout << "M  : ERROR in select() while waiting for all clear" << endl;)
+        } else if (rv == 0) {
+            D(cout << "M  : ERROR: Unexpected timeout in select() while waiting for all clear" << endl;)
+        } else {
+            for (int i = 0; i < get_num_servers(); i++) {
+                if(get_server_status(i) == DEAD)
+                    continue;
+                if (FD_ISSET(fds[i], &server_set)) { // we got one!!
+                    char buf[kMaxDataSize];
+                    if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1) {
+                        D(cout << "M  : ERROR in receiving all clear domr from server S" << i << endl;)
+                    }
+                    else if (num_bytes == 0)
+                    {   //connection closed
+                        D(cout << "M  : ERROR Connection closed by server S" << i << endl;)
+                    }
+                    else
+                    {
+                        buf[num_bytes] = '\0';
+                        std::vector<string> message = split(string(buf), kMessageDelim[0]);
+                        for (const auto &msg : message)
+                        {
+                            std::vector<string> token = split(string(msg), kInternalDelim[0]);
+                            if (token[0] == kAllClearDone)
+                            {
+                                // D(cout<<"M: S"<<i<<" is allClearDone"<<endl;)
+                                waitfor--;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void Master::SendAllClearToServers(const string& type)
+{
+    string message;
+    ConstructAllClearMessage(message, type);
+
+    for (int i = 0; i < get_num_servers(); i++)
+    {
+        if (get_server_status(i) != DEAD) {
+            SendMessageToServer(i, message);
+        }
+    }
+    D(cout << "M  : " << type << " sent to all servers" << endl;)
+}
+
+void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, int& fd_max)
+{
+    int fd_temp;
+    fd_max = INT_MIN;
+    server_fd_vec.clear();
+    FD_ZERO(&server_fd_set);
+    for (int i = 0; i < get_num_servers(); i++)
+    {
+        if (get_server_status(i) != DEAD) {
+            fd_temp = get_server_fd(i);
+            if (fd_temp != -1)
+            {
+                FD_SET(fd_temp, &server_fd_set);
+                fd_max = max(fd_max, fd_temp);
+                server_fd_vec.push_back(fd_temp);
+            }
         }
     }
 }
@@ -236,7 +341,7 @@ void Master::TimeBombLeader(const int num_messages) {
         buf[num_bytes] = '\0';
         std::vector<string> msg = split(string(buf), kMessageDelim[0]);
         for (auto &m : msg) {
-            if (m == kSuicide) {
+            if (m == kKillMe) {
                 CrashServer(primary_id);
                 NewPrimaryElection();
             } else {
@@ -278,18 +383,18 @@ void Master::ElectNewPrimary() {
  * sends id of new primary to each client
  */
 void Master::InformClientsAboutNewPrimary() {
-    string msg = kNewPrimary + to_string(get_primary_id()) + kMessageDelim;
+    string msg = kNewPrimary + kInternalDelim + to_string(get_primary_id()) + kMessageDelim;
     for (int i = 0; i < num_clients_; ++i) {
         SendMessageToClient(i, msg);
     }
 }
 
 /**
- * sends id of new primary to each client
+ * sends id of new primary to each server
  */
 void Master::InformServersAboutNewPrimary() {
-    string msg = kNewPrimary + to_string(get_primary_id()) + kMessageDelim;
-    for (int i = 0; i < num_clients_; ++i) {
+    string msg = kNewPrimary + kInternalDelim + to_string(get_primary_id()) + kMessageDelim;
+    for (int i = 0; i < num_servers_; ++i) {
         if (server_status_[i] != DEAD) {
             SendMessageToServer(i, msg);
         }
@@ -343,9 +448,9 @@ void Master::Initialize() {
     client_fd_.resize(num_clients_, -1);
     server_listen_port_.resize(num_servers_);
     client_listen_port_.resize(num_clients_);
-    fout_.resize(num_clients_);
+    // fout_.resize(num_clients_);
     server_status_.resize(num_servers_, RUNNING);
-
+    fout_ = new ofstream[num_clients_];
     for (int i = 0; i < num_clients_; ++i) {
         fout_[i].open(kChatLogFile + to_string(i), ios::app);
     }
@@ -379,7 +484,7 @@ bool Master::SpawnServers(const int n) {
                              argv,
                              environ);
         if (status == 0) {
-            D(cout << "M  : Spawed server S" << i << endl;)
+            // D(cout << "M  : Spawed server S" << i << endl;)
             set_server_pid(i, pid);
         } else {
             D(cout << "M  : ERROR: Cannot spawn server S"
@@ -392,7 +497,7 @@ bool Master::SpawnServers(const int n) {
     usleep(kGeneralSleep);
     for (int i = 0; i < n; ++i) {
         if (ConnectToServer(i)) {
-            D(cout << "M  : Connected to server S" << i << endl;)
+            // D(cout << "M  : Connected to server S" << i << endl;)
         } else {
             D(cout << "M  : ERROR: Cannot connect to server S" << i << endl;)
             return false;
@@ -429,7 +534,7 @@ bool Master::SpawnClients(const int n) {
                              argv,
                              environ);
         if (status == 0) {
-            D(cout << "M  : Spawed client C" << i << endl;)
+            // D(cout << "M  : Spawed client C" << i << endl;)
             set_client_pid(i, pid);
         } else {
             D(cout << "M  : ERROR: Cannot spawn client C" << i << " - " << strerror(status) << endl;)
@@ -441,7 +546,7 @@ bool Master::SpawnClients(const int n) {
     usleep(kGeneralSleep);
     for (int i = 0; i < n; ++i) {
         if (ConnectToClient(i)) {
-            D(cout << "M  : Connected to client C" << i << endl;)
+            // D(cout << "M  : Connected to client C" << i << endl;)
         } else {
             D(cout << "M  : ERROR: Cannot connect to client C" << i << endl;)
             return false;
@@ -454,7 +559,8 @@ bool Master::SpawnClients(const int n) {
  * kills the specified server. Set its pid and fd to -1
  * @param server_id id of server to be killed
  */
-void Master::CrashServer(const int server_id) {
+void Master::CrashServer(const int server_id)
+{
     int pid = get_server_pid(server_id);
     if (pid != -1) {
         // TODO: Think whether SIGKILL or SIGTERM
@@ -530,7 +636,7 @@ int main() {
     Master M;
     M.ReadTest();
 
-    usleep(8000 * 1000);
+    usleep(18000 * 1000);
     M.KillAllServers();
     M.KillAllClients();
     return 0;

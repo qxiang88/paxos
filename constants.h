@@ -5,7 +5,7 @@ using namespace std;
 
 // constants for socket connections
 const int kMaxDataSize = 2000 ;          // max number of bytes we can get at once
-const int kBacklog = 10;                // how many pending connections queue will hold
+const int kBacklog = 20;                // how many pending connections queue will hold
 
 // filenames
 const string kPortsFile = "./config/ports-file";
@@ -16,6 +16,7 @@ const string kSendMessage = "sendMessage";
 const string kCrashServer = "crashServer";
 const string kRestartServer = "restartServer";
 const string kAllClear = "allClear";
+const string kAllClearRemove = "allClearRemove";
 const string kTimeBombLeader = "timeBombLeader";
 const string kPrintChatLog = "printChatLog";
 
@@ -33,22 +34,30 @@ const string kChat = "CHAT";
 const string kChatLog = "CHATLOG";
 const string kNewPrimary = "NEWPRIMARY";
 const string kTimeBomb = "TIMEBOMB";
-const string kSuicide = "SUICIDE";
-
+const string kKillMe = "KILLME";
 
 const string kP1a = "P1A";
 const string kP2a = "P2A";
 const string kP1b = "P1B";
 const string kP2b = "P2B";
 const string kDecision = "DECISION";
+const string kAllDecisions = "ALLDECISIONS";
 const string kPreEmpted = "PREEMPTED";
 const string kAdopted = "ADOPTED";
 const string kPropose = "PROPOSE";
 const string kResponse = "RESPONSE";
 
+const string kLeaderRole = "LEADER";
+const string kReplicaRole = "REPLICA";
+
+const string kAllClearSet = "SET";
+const string kAllClearNotSet = "NOTSET";
+const string kAllClearDone = "DONE";
+
 // sleep values
 const time_t kGeneralSleep = 1000 * 1000;
 const time_t kBusyWaitSleep = 500 * 1000;
+const time_t kAllClearSleep = 500 * 1000;
 
 // timeout values
 const timeval kReceiveTimeoutTimeval = {

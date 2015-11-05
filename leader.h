@@ -18,14 +18,15 @@ public:
     bool ConnectToReplica(const int server_id);
     void LeaderMode();
     void IncrementBallotNum();
-    void GetFdSet(fd_set& recv_from_set, int& fd_max);
-
+    void SendReplicasAllDecisions();
+    void GetFdSet(fd_set& recv_from_set, int& fd_max, std::vector<int> &fds);
 
     int get_commander_fd(const int server_id);
     int get_scout_fd(const int server_id);
     int get_replica_fd(const int server_id);
     Ballot get_ballot_num();
     bool get_leader_active();
+    int get_num_servers();
 
     void set_commander_fd(const int server_id, const int fd);
     void set_scout_fd(const int server_id, const int fd);
@@ -37,11 +38,13 @@ public:
 
     Server *S;
     std::map<int, Proposal> proposals_;
+    std::map<int, Proposal> decisions_; //for ALL CLEAR
 
 private:
     Ballot ballot_num_;
     bool leader_active_;
-
+    int num_commanders_;
+    vector<pthread_t> commanders_;
     std::vector<int> commander_fd_;
     std::vector<int> scout_fd_;
     std::vector<int> replica_fd_;

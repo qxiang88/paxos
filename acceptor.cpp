@@ -111,19 +111,20 @@ void Acceptor::SendBackOwnFD(const int fd) {
     }
 }
 
-void Acceptor::Unicast(const string &type, const string& msg, int r_fd)
+void Acceptor::Unicast(const string &type, const string& msg,
+                       const int primary_id, int r_fd)
 {
     int serv_fd;
     if (r_fd == -1)
-        serv_fd = get_scout_fd(S->get_primary_id());
+        serv_fd = get_scout_fd(primary_id);
     else
         serv_fd = r_fd;
 
     if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
         D(cout << "SA" << S->get_pid() << ": ERROR in sending " << type << endl;)
-        if (serv_fd == get_scout_fd(S->get_primary_id())) {
+        if (serv_fd == get_scout_fd(primary_id)) {
             close(serv_fd);
-            set_scout_fd(S->get_primary_id(), -1);
+            set_scout_fd(primary_id, -1);
         } else {
             RemoveFromCommanderFDSet(serv_fd);
         }
@@ -138,12 +139,13 @@ void Acceptor::Unicast(const string &type, const string& msg, int r_fd)
  * @param b  current best ballot num of acceptor
  * @param st accepted set of acceptor
  */
-void Acceptor::SendP1b(const Ballot& b, const unordered_set<Triple> &st)
+void Acceptor::SendP1b(const Ballot& b, const unordered_set<Triple> &st,
+                       const int primary_id)
 {
     string msg = kP1b + kInternalDelim + to_string(S->get_pid());
     msg += kInternalDelim + ballotToString(b) + kInternalDelim;
     msg += tripleSetToString(st) + kMessageDelim;
-    Unicast(kP1b, msg);
+    Unicast(kP1b, msg, primary_id);
 }
 
 /**
@@ -151,27 +153,31 @@ void Acceptor::SendP1b(const Ballot& b, const unordered_set<Triple> &st)
  * @param b         current best ballot num of acceptor
  * @param return_fd acceptor side fd for the commander-acceptor connection
  */
-void Acceptor::SendP2b(const Ballot& b, int return_fd)
+void Acceptor::SendP2b(const Ballot& b, int return_fd, const int primary_id)
 {
     string msg = kP2b + kInternalDelim + to_string(S->get_pid());
     msg += kInternalDelim + ballotToString(b) + kMessageDelim;
-    Unicast(kP2b, msg, return_fd);
+    Unicast(kP2b, msg, primary_id, return_fd);
 }
 
 /**
  * function for performing acceptor related job
  */
-void Acceptor::AcceptorMode()
+void Acceptor::AcceptorMode(const int primary_id)
 {
     int num_bytes;
 
     fd_set recv_from;
 
     while (true) {  // always listen to messages from the acceptors
+        if (primary_id != S->get_primary_id()) {   // new primary has been elected
+            set_scout_fd(primary_id, -1);
+            return;
+        }
 
         int fd_max = INT_MIN, fd_temp;
         GetCommanderFdSet(recv_from, fd_max);
-        int primary_id = S->get_primary_id();
+
         fd_temp = get_scout_fd(primary_id);
         if (fd_temp != -1)
         {
@@ -222,7 +228,7 @@ void Acceptor::AcceptorMode()
                                 Ballot recvd_ballot = stringToBallot(token[2]);
                                 if (recvd_ballot > get_best_ballot_num())
                                     set_best_ballot_num(recvd_ballot);
-                                SendP1b(get_best_ballot_num(), accepted_);
+                                SendP1b(get_best_ballot_num(), accepted_, primary_id);
                             }
                             else if (token[0] == kP2a)
                             {
@@ -235,7 +241,7 @@ void Acceptor::AcceptorMode()
                                     set_best_ballot_num(recvd_triple.b);
                                     accepted_.insert(recvd_triple);
                                 }
-                                SendP2b(get_best_ballot_num(), return_fd);
+                                SendP2b(get_best_ballot_num(), return_fd, primary_id);
                             }
                             else {    //other messages
                                 D(cout << "SA" << S->get_pid() << ": Unexpected message received: " << msg << endl;)
@@ -259,19 +265,25 @@ void* AcceptorEntry(void *_S) {
     pthread_t accept_connections_thread;
     CreateThread(AcceptConnectionsAcceptor, (void*)&A, accept_connections_thread);
 
-    int primary_id = A.S->get_primary_id();
+    while (true) {
+        int primary_id = A.S->get_primary_id();
 
-    // sleep for some time to make sure accept threads of scouts are running
-    usleep(kGeneralSleep);
-    usleep(kGeneralSleep);
-    if (A.ConnectToScout(primary_id)) {
-        D(cout << "SA" << A.S->get_pid() << ": Connected to scout of S"
-          << primary_id << endl;)
-    } else {
-        D(cout << "SA" << A.S->get_pid() << ": ERROR in connecting to scout of S"
-          << primary_id << endl;)
-        return NULL;
+        // sleep for some time to make sure accept threads of scouts are running
+        usleep(kGeneralSleep);
+        usleep(kGeneralSleep);
+        if (A.ConnectToScout(primary_id)) {
+            D(cout << "SA" << A.S->get_pid() << ": Connected to scout of S"
+              << primary_id << endl;)
+        } else {
+            D(cout << "SA" << A.S->get_pid() << ": ERROR in connecting to scout of S"
+              << primary_id << endl;)
+            return NULL;
+        }
+
+        usleep(kGeneralSleep);
+        usleep(kGeneralSleep);
+        usleep(kGeneralSleep);
+        
+        A.AcceptorMode(primary_id);
     }
-
-    A.AcceptorMode();
 }

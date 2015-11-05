@@ -14,6 +14,8 @@ class Commander;
 class Scout;
 
 void* ReceiveMessagesFromClient(void* _rcv_thread_arg); //R
+void* ReceiveMessagesFromMaster(void* _S );
+
 
 class Server {
 public:
@@ -27,10 +29,14 @@ public:
     bool ReadPortsFile();
     void CommanderAcceptThread(Commander* C);
     void ScoutAcceptThread(Scout* SC);
-
+    void AllClearPhase();
+    void FinishAllClear();
+    void HandleNewPrimary(const int new_primary_id);
+    
     int get_pid();
     int get_num_servers();
     int get_num_clients();
+    string get_all_clear(string);
     int get_master_port();
     int get_server_listen_port(const int server_id);
     int get_client_listen_port(const int client_id);
@@ -44,11 +50,15 @@ public:
     int get_leader_port(const int server_id);
     int get_primary_id();  // common
     Scout* get_scout_object();
+    int get_master_fd();
+
 
     void set_pid(const int pid);
     void set_master_fd(const int fd);
     void set_primary_id(const int primary_id);
     void set_scout_object();
+    void set_all_clear(string, string);
+
 
 private:
     int pid_;   // server's ID
@@ -57,7 +67,9 @@ private:
     int primary_id_;
 
     int master_fd_;
-    
+
+    std::map<string, string> all_clear_;
+
     int master_port_;   // port used by master for communication
     std::vector<int> server_listen_port_;
     std::vector<int> client_listen_port_;

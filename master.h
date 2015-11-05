@@ -3,6 +3,7 @@
 #include "vector"
 #include "string"
 #include "fstream"
+#include "iostream"
 using namespace std;
 
 typedef enum {
@@ -30,6 +31,14 @@ public:
     void PrintChatLog(const int client_id, const string &chat_log);
     void ElectNewLeader();
     void TimeBombLeader(const int num_messages);
+    void SendAllClearToServers(const string&);
+    void WaitForAllClearDone();
+    void GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, int& fd_max);
+    void ConstructAllClearMessage(string &message, const string& type);
+    void NewPrimaryElection();
+    void ElectNewPrimary();
+    void InformClientsAboutNewPrimary();
+    void InformServersAboutNewPrimary();
 
     int get_server_fd(const int server_id);
     int get_client_fd(const int client_id);
@@ -39,11 +48,8 @@ public:
     int get_server_pid(const int server_id);
     int get_client_pid(const int client_id);
     int get_primary_id();
+    int get_num_servers();
     Status get_server_status(const int server_id);
-    void NewPrimaryElection();
-    void ElectNewPrimary();
-    void InformClientsAboutNewPrimary();
-    void InformServersAboutNewPrimary();
 
     void set_server_pid(const int server_id, const int pid);
     void set_client_pid(const int client_id, const int pid);
@@ -57,7 +63,7 @@ private:
     int num_clients_;
     int primary_id_;
 
-    std::vector<ofstream> fout_;
+    ofstream* fout_;
     std::vector<Status> server_status_;
 
     std::vector<int> server_pid_;

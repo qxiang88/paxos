@@ -20,10 +20,12 @@ public:
     void AddToCommanderFDSet(const int fd);
     void RemoveFromCommanderFDSet(const int fd);
     void SendBackOwnFD(const int fd);
-    void AcceptorMode();
-    void SendP1b(const Ballot& b, const unordered_set<Triple> &st);
-    void SendP2b(const Ballot& b, int return_fd);
-    void Unicast(const string &type, const string& msg, int r_fd = -1);
+    void AcceptorMode(const int primary_id);
+    void SendP1b(const Ballot& b, const unordered_set<Triple> &st,
+                 const int primary_id);
+    void SendP2b(const Ballot& b, int return_fd, const int primary_id);
+    void Unicast(const string &type, const string& msg,
+                 const int primary_id, int r_fd = -1);
 
     int get_scout_fd(const int server_id);
     set<int> get_commander_fd_set();

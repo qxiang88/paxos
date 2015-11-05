@@ -17,13 +17,17 @@ class Replica {
 public:
     bool ConnectToCommander(const int server_id);
     bool ConnectToScout(const int server_id);
-    void Propose(const Proposal &p);
-    void SendProposal(const int& s, const Proposal& p);
-    void Perform(const int& slot, const Proposal& p);
-    void SendResponseToAllClients(const int& s, const Proposal& p);
+    void Propose(const Proposal &p, const int primary_id);
+    void SendProposal(const int& s, const Proposal& p, const int primary_id);
+    void Perform(const int& slot, const Proposal& p, const int primary_id);
+    void SendResponseToAllClients(const int& s, const Proposal& p, const int primary_id);
     void IncrementSlotNum();
-    void ReplicaMode();
-    void Unicast(const string &type, const string& msg);
+    void ReplicaMode(const int primary_id);
+    void Unicast(const string &type, const string& msg, const int primary_id);
+    void ProposeBuffered(const int primary_id);
+    void CheckReceivedAllDecisions(map<int, Proposal>& allDecisions);
+    void CreateFdSet(fd_set& fromset, vector<int> &fds, int& fd_max, const int primary_id);
+    void ResetFD(const int fd, const int primary_id);
 
     int get_slot_num();
     int get_commander_fd(const int server_id);
@@ -50,7 +54,8 @@ private:
     std::vector<int> scout_fd_;
     std::vector<int> leader_fd_;
     std::vector<int> client_chat_fd_;
-
+    
+    vector<Proposal> buffered_proposals_;
 };
 
 struct ReceiveThreadArgument {

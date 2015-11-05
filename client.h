@@ -42,7 +42,7 @@ public:
     void SendChatLogToMaster();
     void ResendChats();
     void AddToDecidedChatIDs(const int chat_id);
-
+    void HandleNewPrimary(const int new_primary);
 
     int get_pid();
     int get_master_fd();

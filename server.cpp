@@ -31,6 +31,8 @@ extern void *ReplicaEntry(void *_S);
 extern void *AcceptorEntry(void *_S);
 extern void *LeaderEntry(void *_S);
 
+pthread_mutex_t all_clear_lock;
+
 int Server::get_pid() {
     return pid_;
 }
@@ -83,6 +85,29 @@ int Server::get_num_servers() {
     return num_servers_;
 }
 
+int Server::get_master_fd() {
+    return master_fd_;
+}
+
+string Server::get_all_clear(string role)
+{
+    string temp;
+    if (role == kLeaderRole)
+    {
+        pthread_mutex_lock(&all_clear_lock);
+        temp = all_clear_[role];
+        pthread_mutex_unlock(&all_clear_lock);
+    }
+    if (role == kReplicaRole)
+    {
+        pthread_mutex_lock(&all_clear_lock);
+        temp = all_clear_[role];
+        pthread_mutex_unlock(&all_clear_lock);
+    }
+    return temp;
+}
+
+
 int Server::get_num_clients() {
     return num_clients_;
 }
@@ -107,6 +132,21 @@ void Server::set_scout_object() {
     scout_object_ = new Scout(this);
 }
 
+void Server::set_all_clear(string role, string status)
+{
+    if (role == kLeaderRole)
+    {
+        pthread_mutex_lock(&all_clear_lock);
+        all_clear_[role] = status;
+        pthread_mutex_unlock(&all_clear_lock);
+    }
+    if (role == kReplicaRole)
+    {
+        pthread_mutex_lock(&all_clear_lock);
+        all_clear_[role] = status;
+        pthread_mutex_unlock(&all_clear_lock);
+    }
+}
 /**
  * checks if given port corresponds to a client's chat port
  * @param  port port number to be checked
@@ -245,6 +285,13 @@ void Server::Initialize(const int pid,
     acceptor_port_.resize(num_servers_);
     replica_port_.resize(num_servers_);
     leader_port_.resize(num_servers_);
+
+    if (pthread_mutex_init(&all_clear_lock, NULL) != 0) {
+        D(cout << "S" << get_pid() << " : Mutex init failed" << endl;)
+    }
+
+    set_all_clear(kLeaderRole, kAllClearNotSet);
+    set_all_clear(kReplicaRole, kAllClearNotSet);
 }
 
 /**
@@ -263,6 +310,90 @@ void Server::ScoutAcceptThread(Scout* SC) {
     CreateThread(AcceptConnectionsScout, (void*)SC, accept_connections_thread);
 }
 
+void Server::AllClearPhase()
+{
+    sleep(2); //for testing allclear
+    set_all_clear(kReplicaRole, kAllClearSet);
+
+    if (get_pid() == get_primary_id())
+        set_all_clear(kLeaderRole, kAllClearSet);
+    else
+        set_all_clear(kLeaderRole, kAllClearDone);
+
+    while ((get_all_clear(kReplicaRole) != kAllClearDone) || (get_all_clear(kLeaderRole) != kAllClearDone))
+    {
+        usleep(kAllClearSleep);
+    }
+
+    string message = kAllClearDone + kMessageDelim;
+    if (send(get_master_fd(), message.c_str(), message.size(), 0) == -1) {
+        D(cout << "S" << get_pid() << " : ERROR: Cannot send all clear done to master" <<  endl;)
+    } else {
+        D(cout << "S" << get_pid() << " : All clear done message sent to master" << endl;)
+    }
+    //wait for messages from leader and replica. once received. send to master
+}
+
+void Server::FinishAllClear()
+{
+    set_all_clear(kReplicaRole, kAllClearNotSet);
+    set_all_clear(kLeaderRole, kAllClearNotSet);
+}
+
+/**
+ * handles functions to be executed on receipt of new primary
+ * @param new_primary_id id of the new primary elected
+ */
+void Server::HandleNewPrimary(const int new_primary_id) {
+    set_primary_id(new_primary_id);
+
+    if (get_pid() == get_primary_id()) {
+        Commander *C = new Commander(this, get_num_servers());
+        CommanderAcceptThread(C);
+
+        set_scout_object();
+        ScoutAcceptThread(get_scout_object());
+
+        pthread_t leader_thread;
+        CreateThread(LeaderEntry, (void*)this, leader_thread);
+    }
+}
+
+void* ReceiveMessagesFromMaster(void* _S ) {
+    Server* S = (Server*)_S;
+    char buf[kMaxDataSize];
+    int num_bytes;
+    while (true) {  // always listen to messages from the master
+        num_bytes = recv(S->get_master_fd(), buf, kMaxDataSize - 1, 0);
+        if (num_bytes == -1) {
+            D(cout << "S" << S->get_pid() << " : ERROR in receiving message from M" << endl;)
+        } else if (num_bytes == 0) {    // connection closed by master
+            D(cout << "S" << S->get_pid() << " : Connection closed by M" << endl;)
+        } else {
+            buf[num_bytes] = '\0';
+
+            // extract multiple messages from the received buf
+            std::vector<string> message = split(string(buf), kMessageDelim[0]);
+            for (const auto &msg : message) {
+                std::vector<string> token = split(string(msg), kInternalDelim[0]);
+                if (token[0] == kAllClear) {
+                    S->AllClearPhase(); //send to (leader)x and replica
+                }
+                else if (token[0] == kAllClearRemove)
+                {
+                    S->FinishAllClear();
+                } else if (token[0] == kNewPrimary) {
+                    D(cout << "S" << S->get_pid() << " : Received new primary id S" << token[1] << endl;)
+                    S->HandleNewPrimary(stoi(token[1]));
+                } else {    //other messages
+                    D(cout << "S" << S->get_pid() << " : ERROR Unexpected message received from M" << endl;)
+                }
+            }
+        }
+    }
+    return NULL;
+}
+
 int main(int argc, char *argv[]) {
     Server S;
     S.Initialize(atoi(argv[1]), atoi(argv[2]), atoi(argv[3]));
@@ -275,7 +406,6 @@ int main(int argc, char *argv[]) {
 
     if (S.get_pid() == S.get_primary_id()) {
         Commander *C = new Commander(&S, S.get_num_servers());
-        // Commander C();
         S.CommanderAcceptThread(C);
 
         S.set_scout_object();

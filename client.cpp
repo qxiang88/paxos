@@ -148,8 +148,6 @@ void Client::SendChatToPrimary(const int chat_id, const string &chat_message) {
     if (send(get_primary_fd(), msg.c_str(), msg.size(), 0) == -1) {
         D(cout << "C" << get_pid() << " : ERROR: Cannot send chat message to primary S"
           << primary_id << endl;)
-        //TODO: Need to take some action like increment primary_id?
-        //or wait for update command from master?
     } else {
         D(cout << "C" << get_pid() << " : Chat message sent to primary S"
           << primary_id << ": " << msg << endl;)
@@ -161,7 +159,7 @@ void Client::SendChatToPrimary(const int chat_id, const string &chat_message) {
  */
 void Client::ResendChats() {
     for (int i = 0; i < chat_list_.size(); ++i) {
-        if(decided_chat_ids_.find(i) == decided_chat_ids_.end()) {
+        if (decided_chat_ids_.find(i) == decided_chat_ids_.end()) {
             SendChatToPrimary(i, chat_list_[i]);
         }
     }
@@ -238,6 +236,22 @@ void Client::SendChatLogToMaster() {
 }
 
 /**
+ * handles new primary related tasks, like connecting to new primary
+ * and resending undecided chats to new primary
+ */
+void Client::HandleNewPrimary(const int new_primary) {
+    set_primary_id(new_primary);
+    
+    if (ConnectToPrimary()) {
+        D(cout << "C" << get_pid() << " : Connected to primary S" << get_primary_id() << endl;)
+    } else {
+        D(cout << "C" << get_pid() << " : ERROR in connecting to primary S" << get_primary_id() << endl;)
+    }
+
+    ResendChats();
+}
+
+/**
  * Initialize all mutex locks
  */
 void Client::InitializeLocks() {
@@ -283,8 +297,7 @@ void* ReceiveMessagesFromMaster(void* _C) {
                     int new_primary = stoi(token[1]);
                     D(cout << "C" << C->get_pid()
                       << " : New primary id received from M: " << new_primary <<  endl;)
-                    C->set_primary_id(new_primary);
-                    C->ResendChats();
+                    C->HandleNewPrimary(new_primary);
                 } else {    //other messages
                     D(cout << "C" << C->get_pid()
                       << " : ERROR Unexpected message received from M" <<  endl;)
@@ -318,9 +331,7 @@ void* ReceiveMessagesFromPrimary(void* _C) {
             // " : ERROR in receiving message from primary S" << primary_id << endl;)
             usleep(kBusyWaitSleep);
         } else if (num_bytes == 0) {    // connection closed by primary
-            // D(cout << "C" << C->get_pid() << " : Connection closed by primary S" << primary_id << endl;)
-            //TODO: Need to take some action like increment primary_id?
-            //or wait for update command from master?
+            D(cout << "C" << C->get_pid() << " : Connection closed by primary S" << primary_id << endl;)
             usleep(kBusyWaitSleep);
         } else {
             buf[num_bytes] = '\0';
@@ -380,5 +391,6 @@ int main(int argc, char *argv[]) {
     CreateThread(ReceiveMessagesFromPrimary, (void*)&C, receive_from_primary_thread);
 
     pthread_join(receive_from_master_thread, &status);
+    pthread_join(receive_from_primary_thread, &status);
     return 0;
 }

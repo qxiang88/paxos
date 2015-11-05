@@ -49,7 +49,7 @@ bool Ballot::operator<=(const Ballot &b2) const {
 // bool Ballot::operator()(const Ballot &b) const {
 //     return ((hash<int>() (b.id)
 //             ^ ( hash<int>() (b.seq_num) <<1 )));
-                                
+
 // }
 
 // bool Proposal::operator()(const Proposal &p) const {
@@ -136,15 +136,84 @@ string ballotToString(const Ballot& b)
 string tripleSetToString(const unordered_set<Triple>& st)
 {
    string rval;
-    for (auto it=st.begin(); it!=st.end(); it++)
+   for (auto it=st.begin(); it!=st.end(); it++)
+   {
+    if(it!=st.begin())
+        rval += kInternalSetDelim;
+    rval += tripleToString(*it);
+}
+return rval;
+}
+
+string allDecisionsToString(const map<int, Proposal>& d)
+{
+    string rval;
+    for (auto it=d.begin(); it!=d.end(); it++)
     {
-        if(it!=st.begin())
+        if(it!=d.begin())
             rval += kInternalSetDelim;
-        rval += tripleToString(*it);
+        rval += decisionToStringForAll(it->first, it->second);
     }
     return rval;
 }
 
+string decisionToStringForAll(const int& s, const Proposal& p)
+{
+    string rval;
+    rval += to_string(s);
+    rval += kInternalStructDelim;
+    rval += proposalToString(p);
+    return rval;
+}
+
+string decisionToString(const int& s, const Proposal& p)
+{
+    string rval;
+    rval += to_string(s);
+    rval += kInternalDelim;
+    rval += proposalToString(p);
+    return rval;
+}
+
+void stringToDecision(const string& dec, int& s, Proposal& p)
+{
+    vector<string> parts = split(dec, kInternalStructDelim[0]);
+    if(parts.size()!=1)
+        D(cout<<"Cant convert to decision. Error."<<endl;)
+    s = stoi(parts[0]);
+    p = stringToProposal(parts[1]);
+}
+void stringToDecisionForAll(const string& dec, int& s, Proposal& p)
+{
+    vector<string> parts = split(dec, kInternalStructDelim[0]);
+    // D(cout<<"parts size is "<<parts.size()<<endl;)
+    // D(cout<<parts[0]<<" "<<parts[1]<<" "<<parts[2]<<" "<<parts[3]<<endl;)
+    if(parts.size()!=4)
+    {
+        D(cout<<"Cant convert to decision. Error."<<endl;)
+        D(cout<<parts.size()<<" ----------------------------------------"<<dec<<endl;)
+        return;
+    }
+    s = stoi(parts[0]);
+    string prop = parts[1]+kInternalStructDelim+parts[2]+kInternalStructDelim+parts[3];
+    p = stringToProposal(prop);
+}
+
+void stringToAllDecisions(string s, map<int, Proposal>& decs)
+{
+    decs.clear();
+    // cout<<"string is "<<s;
+    vector<string> decisions = split(s, kInternalSetDelim[0]);
+    // cout<<". dec size is "<<decisions.size()<<endl;
+    for(auto &d : decisions)
+    {
+        int s;
+        Proposal p;
+        // cout<<"one dec: "<<d<<endl;
+        stringToDecisionForAll(d, s, p);
+        decs[s]=p;
+    }
+}
 
 Triple stringToTriple(const string& s)
 {
@@ -243,7 +312,7 @@ map<int, Proposal> pairxor(const map<int, Proposal> &x,const map<int, Proposal> 
  * @param  arg arguments for the function f passed to the thread
  * @param  thread thread identifier for new thread
  */
-void CreateThread(void* (*f)(void* ), void* arg, pthread_t &thread) {
+ void CreateThread(void* (*f)(void* ), void* arg, pthread_t &thread) {
     if (pthread_create(&thread, NULL, f, arg)) {
         D(cout << "U " << ": ERROR: Unable to create thread" << endl;)
         pthread_exit(NULL);

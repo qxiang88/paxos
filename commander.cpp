@@ -96,6 +96,11 @@ void Commander::SendP2a(const Triple &t, const vector<int> &acceptor_peer_fd)
     for (int i = 0; i < S->get_num_servers(); i++)
     {
         serv_fd = get_acceptor_fd(i);
+        
+        if (serv_fd == -1) {
+            continue;
+        }
+
         string msg = kP2a + kInternalDelim + to_string(acceptor_peer_fd[i]);
         msg += kInternalDelim + tripleToString(t) + kMessageDelim;
 
@@ -117,6 +122,8 @@ void Commander::SendDecision(const Triple &t)
     string msg = kDecision + kInternalDelim + to_string(t.s) + kInternalDelim;
     msg += proposalToString(t.p)  + kMessageDelim;
     SendToServers(kDecision, msg);
+    Unicast(kDecision, msg);
+
 }
 
 void Commander::SendPreEmpted(const Ballot& b)
@@ -138,13 +145,11 @@ void Commander::ConnectToAllAcceptors(std::vector<int> &acceptor_peer_fd) {
             if (num_bytes == -1) {
                 D(cout << "SC" << S->get_pid() <<
                   ": ERROR in receiving fd from acceptor S" << i << endl;)
-                //TODO: should I close the acceptor_fd?
                 close(get_acceptor_fd(i));
                 set_acceptor_fd(i, -1);
             } else if (num_bytes == 0) {
                 D(cout << "SC" << S->get_pid() <<
                   ": Connection closed by acceptor S" << i << endl;)
-                //TODO: should I close the acceptor_fd?
                 close(get_acceptor_fd(i));
                 set_acceptor_fd(i, -1);
             } else {
