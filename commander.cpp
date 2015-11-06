@@ -184,7 +184,7 @@ void Commander::GetAcceptorFdSet(fd_set& acceptor_set, int& fd_max)
 /**
  * close all connections with acceptors before exiting
  */
-void Commander::CloseAllConnections() {
+ void Commander::CloseAllConnections() {
     int acceptor_fd;
     for (int i = 0; i < S->get_num_servers(); ++i) {
         acceptor_fd = get_acceptor_fd(i);

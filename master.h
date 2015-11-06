@@ -33,8 +33,9 @@ public:
     void TimeBombLeader(const int num_messages);
     void SendAllClearToServers(const string&);
     void WaitForAllClearDone();
-    void GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, int& fd_max);
+    void GetServerFdSet(fd_set& server_fd_set, vector<int>& fds, int& fd_max);
     void ConstructAllClearMessage(string &message, const string& type);
+    // int GetServerIdWithFd(int);
     void NewPrimaryElection();
     void ElectNewPrimary();
     void InformClientsAboutNewPrimary();

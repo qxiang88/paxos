@@ -94,7 +94,7 @@ void Master::set_server_status(const int server_id, const Status s) {
  * @param command the sendMessage command given by user
  * @param message [out] extracted chat message
  */
-void Master::ExtractChatMessage(const string &command, string &message) {
+ void Master::ExtractChatMessage(const string &command, string &message) {
     int n = command.size();
     int i = 0;
     int spaces_count = 0;
@@ -115,7 +115,7 @@ void Master::ExtractChatMessage(const string &command, string &message) {
  * @param chat_message body of chat message
  * @param message      [out] templated message which can be sent
  */
-void Master::ConstructChatMessage(const string &chat_message, string &message) {
+ void Master::ConstructChatMessage(const string &chat_message, string &message) {
     message = kChat + kInternalDelim + chat_message + kMessageDelim;
 }
 
@@ -123,7 +123,7 @@ void Master::ConstructChatMessage(const string &chat_message, string &message) {
  * reads ports-file and populates port related vectors/maps
  * @return true is ports-file was read successfully
  */
-bool Master::ReadPortsFile() {
+ bool Master::ReadPortsFile() {
     ifstream fin;
     fin.exceptions ( ifstream::failbit | ifstream::badbit );
     try {
@@ -157,7 +157,7 @@ bool Master::ReadPortsFile() {
 /**
  * reads test commands from stdin
  */
-void Master::ReadTest() {
+ void Master::ReadTest() {
     string line;
     while (getline(std::cin, line)) {
         std::istringstream iss(line);
@@ -261,7 +261,6 @@ void Master::WaitForGoAhead() {
 
 void Master::WaitForAllClearDone()
 {
-
     fd_set server_set;
     int fd_max, num_bytes;
     int num_servers = get_num_servers();
@@ -288,16 +287,25 @@ void Master::WaitForAllClearDone()
             D(cout << "M  : ERROR: Unexpected timeout in select() while waiting for all clear" << endl;)
         } else {
             for (int i = 0; i < fds.size(); i++) {
+                if(get_server_status(i) == DEAD)
+                    continue;
+
                 if (FD_ISSET(fds[i], &server_set)) { // we got one!!
                     char buf[kMaxDataSize];
                     if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1) {
-                        D(cout << "M  : ERROR in receiving all clear domr from server S" << i << endl;)
-                    }
-                    else if (num_bytes == 0)
-                    {   //connection closed
-                        D(cout << "M  : ERROR Connection closed by server S" << i << endl;)
-                    }
-                    else
+                        D(cout << "M: ERROR in receiving all clear domr from server S" << i << endl;)
+                        close(fds[i]);
+                        set_server_fd(i, -1);
+                        waitfor--;
+                    } 
+                    else if (num_bytes == 0) 
+                    {     //connection closed
+                        close(fds[i]);
+                        set_server_fd(i, -1);
+                        waitfor--;
+                        // D(cout << "M: ERROR Connection closed by server S" << i << endl;)
+                    } 
+                    else 
                     {
                         buf[num_bytes] = '\0';
                         std::vector<string> message = split(string(buf), kMessageDelim[0]);
@@ -356,7 +364,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
  * on receiving suicide from primary, it kills primary and elects new primary
  * @param num_messages primary's alloted quota of messages
  */
-void Master::TimeBombLeader(const int num_messages) {
+ void Master::TimeBombLeader(const int num_messages) {
     int primary_id = get_primary_id();
     string msg = kTimeBomb + to_string(num_messages) + kMessageDelim;
     SendMessageToServer(primary_id, msg);
@@ -386,7 +394,7 @@ void Master::TimeBombLeader(const int num_messages) {
  * performs all tasks related to new primary election
  * and informing servers and clients about the new primary
  */
-void Master::NewPrimaryElection() {
+ void Master::NewPrimaryElection() {
     ElectNewPrimary();
     InformServersAboutNewPrimary();
     usleep(kGeneralSleep);
@@ -397,7 +405,7 @@ void Master::NewPrimaryElection() {
 /**
  * elects a new primary among the set of running servers using round robin
  */
-void Master::ElectNewPrimary() {
+ void Master::ElectNewPrimary() {
     int curr_primary = get_primary_id();
     int i = (curr_primary + 1) % num_servers_;
     while (true) {
@@ -413,7 +421,7 @@ void Master::ElectNewPrimary() {
 /**
  * sends id of new primary to each client
  */
-void Master::InformClientsAboutNewPrimary() {
+ void Master::InformClientsAboutNewPrimary() {
     string msg = kNewPrimary + kInternalDelim + to_string(get_primary_id()) + kMessageDelim;
     for (int i = 0; i < num_clients_; ++i) {
         SendMessageToClient(i, msg);
@@ -423,7 +431,7 @@ void Master::InformClientsAboutNewPrimary() {
 /**
  * sends id of new primary to each server
  */
-void Master::InformServersAboutNewPrimary() {
+ void Master::InformServersAboutNewPrimary() {
     string msg = kNewPrimary + kInternalDelim + to_string(get_primary_id()) + kMessageDelim;
     for (int i = 0; i < num_servers_; ++i) {
         if (server_status_[i] != DEAD) {
@@ -432,12 +440,21 @@ void Master::InformServersAboutNewPrimary() {
     }
 }
 
+// int Master::GetServerIdWithFd(int fd)
+// {
+//     vector<int> local = server_fd_;
+//     for(int i=0; i<local.size(); i++)
+//     {
+//         if(local[i]==fd) return i;    
+//     }
+//     return -1;
+// }
 /**
  * receives chatlog from a client
  * @param client_id id of client from which chatlog is to be received
  * @param chat_log  [out] chatlog received in concatenated string form
  */
-void Master::ReceiveChatLogFromClient(const int client_id, string & chat_log) {
+ void Master::ReceiveChatLogFromClient(const int client_id, string & chat_log) {
     char buf[kMaxDataSize];
     int num_bytes;
     num_bytes = recv(get_client_fd(client_id), buf, kMaxDataSize - 1, 0);
@@ -457,7 +474,7 @@ void Master::ReceiveChatLogFromClient(const int client_id, string & chat_log) {
  * prints chat log received from a client in the expected format
  * @param chat_log chat log in concatenated string format
  */
-void Master::PrintChatLog(const int client_id, const string & chat_log) {
+ void Master::PrintChatLog(const int client_id, const string & chat_log) {
     std::vector<string> chat = split(chat_log, kMessageDelim[0]);
     for (auto &c : chat) {
         std::vector<string> token = split(c, kInternalDelim[0]);
@@ -471,7 +488,7 @@ void Master::PrintChatLog(const int client_id, const string & chat_log) {
 /**
  * initialize data members and resize vectors
  */
-void Master::Initialize() {
+ void Master::Initialize() {
     set_primary_id(0);
     server_pid_.resize(num_servers_, -1);
     client_pid_.resize(num_clients_, -1);
@@ -492,28 +509,37 @@ void Master::Initialize() {
  * @param n number of servers to be spawned
  * @return true if n servers were spawned and connected to successfully
  */
-bool Master::SpawnServers(const int n) {
+ bool Master::SpawnServers(const int n) {
     pid_t pid;
     int status;
     for (int i = 0; i < n; ++i) {
         char server_id_arg[10];
         char num_servers_arg[10];
         char num_clients_arg[10];
+        char mode_arg[10];
         sprintf(server_id_arg, "%d", i);
         sprintf(num_servers_arg, "%d", num_servers_);
         sprintf(num_clients_arg, "%d", num_clients_);
+
+        //for testing
+        if(i==1)
+            sprintf(mode_arg, "%d", 2);
+        else
+            sprintf(mode_arg, "%d", 1);
+
         char *argv[] = {(char*)kServerExecutable.c_str(),
-                        server_id_arg,
-                        num_servers_arg,
-                        num_clients_arg,
-                        NULL
-                       };
+            server_id_arg,
+            num_servers_arg,
+            num_clients_arg,
+            mode_arg,
+            NULL
+        };
         status = posix_spawn(&pid,
-                             (char*)kServerExecutable.c_str(),
-                             NULL,
-                             NULL,
-                             argv,
-                             environ);
+           (char*)kServerExecutable.c_str(),
+           NULL,
+           NULL,
+           argv,
+           environ);
         if (status == 0) {
             // D(cout << "M  : Spawed server S" << i << endl;)
             set_server_pid(i, pid);
@@ -542,7 +568,7 @@ bool Master::SpawnServers(const int n) {
  * @param n number of clients to be spawned
  * @return true if n client were spawned and connected to successfully
  */
-bool Master::SpawnClients(const int n) {
+ bool Master::SpawnClients(const int n) {
     pid_t pid;
     int status;
     for (int i = 0; i < n; ++i) {
@@ -553,17 +579,17 @@ bool Master::SpawnClients(const int n) {
         sprintf(num_servers_arg, "%d", num_servers_);
         sprintf(num_clients_arg, "%d", num_clients_);
         char *argv[] = {(char*)kClientExecutable.c_str(),
-                        server_id_arg,
-                        num_servers_arg,
-                        num_clients_arg,
-                        NULL
-                       };
+            server_id_arg,
+            num_servers_arg,
+            num_clients_arg,
+            NULL
+        };
         status = posix_spawn(&pid,
-                             (char*)kClientExecutable.c_str(),
-                             NULL,
-                             NULL,
-                             argv,
-                             environ);
+            (char*)kClientExecutable.c_str(),
+            NULL,
+            NULL,
+            argv,
+            environ);
         if (status == 0) {
             // D(cout << "M  : Spawed client C" << i << endl;)
             set_client_pid(i, pid);
@@ -590,8 +616,8 @@ bool Master::SpawnClients(const int n) {
  * kills the specified server. Set its pid and fd to -1
  * @param server_id id of server to be killed
  */
-void Master::CrashServer(const int server_id)
-{
+ void Master::CrashServer(const int server_id)
+ {
     int pid = get_server_pid(server_id);
     if (pid != -1) {
         // TODO: Think whether SIGKILL or SIGTERM
@@ -608,7 +634,7 @@ void Master::CrashServer(const int server_id)
  * kills the specified client. Set its pid and fd to -1
  * @param client_id id of client to be killed
  */
-void Master::CrashClient(const int client_id) {
+ void Master::CrashClient(const int client_id) {
     int pid = get_client_pid(client_id);
     if (pid != -1) {
         // TODO: Think whether SIGKILL or SIGTERM
@@ -622,7 +648,7 @@ void Master::CrashClient(const int client_id) {
 /**
  * kills all running servers
  */
-void Master::KillAllServers() {
+ void Master::KillAllServers() {
     for (int i = 0; i < num_servers_; ++i) {
         CrashServer(i);
     }
@@ -631,7 +657,7 @@ void Master::KillAllServers() {
 /**
  * kills all running clients
  */
-void Master::KillAllClients() {
+ void Master::KillAllClients() {
     for (int i = 0; i < num_clients_; ++i) {
         CrashClient(i);
     }
@@ -642,7 +668,7 @@ void Master::KillAllClients() {
  * @param client_id id of client to which message needs to be sent
  * @param message   message to be sent
  */
-void Master::SendMessageToClient(const int client_id, const string & message) {
+ void Master::SendMessageToClient(const int client_id, const string & message) {
     if (send(get_client_fd(client_id), message.c_str(), message.size(), 0) == -1) {
         D(cout << "M  : ERROR: Cannot send message to client C" << client_id << endl;)
     } else {
@@ -655,7 +681,7 @@ void Master::SendMessageToClient(const int client_id, const string & message) {
  * @param server_id id of server to which message needs to be sent
  * @param message   message to be sent
  */
-void Master::SendMessageToServer(const int server_id, const string & message) {
+ void Master::SendMessageToServer(const int server_id, const string & message) {
     if (send(get_server_fd(server_id), message.c_str(), message.size(), 0) == -1) {
         D(cout << "M  : ERROR: Cannot send message to server S" << server_id << endl;)
     } else {

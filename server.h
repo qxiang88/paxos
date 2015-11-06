@@ -16,12 +16,16 @@ class Scout;
 void* ReceiveMessagesFromClient(void* _rcv_thread_arg); //R
 void* ReceiveMessagesFromMaster(void* _S );
 
+typedef enum {
+    DEAD, RUNNING, RECOVER
+} Status;
 
 class Server {
 public:
     void Initialize(const int pid,
                     const int num_servers,
-                    const int num_clients);
+                    const int num_clients,
+                    int mode);
     int IsReplicaPort(const int port);
     int IsAcceptorPort(const int port);
     int IsLeaderPort(const int port);
@@ -55,11 +59,12 @@ public:
     int get_primary_id();  // common
     Scout* get_scout_object();
     int get_master_fd();
-
+    Status get_mode();
 
     void set_leader_ready(bool b);
     void set_replica_ready(bool b);
     void set_acceptor_ready(bool b);
+    void set_mode(Status);
     void set_pid(const int pid);
     void set_master_fd(const int fd);
     void set_primary_id(const int primary_id);
@@ -75,6 +80,7 @@ private:
     bool leader_ready_;
     bool acceptor_ready_;
     bool replica_ready_;
+    Status mode_;
 
     int master_fd_;
 

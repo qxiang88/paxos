@@ -1,2 +1,7 @@
-lock
-class reorganization
+remove get_replica_port ?
+
+void Master::WaitForAllClearDone()
+set_server_fd(i,-1) replace i with actual server id
+
+
+Set mode for server when recovering

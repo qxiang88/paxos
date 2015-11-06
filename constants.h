@@ -43,6 +43,7 @@ const string kP1b = "P1B";
 const string kP2b = "P2B";
 const string kDecision = "DECISION";
 const string kAllDecisions = "ALLDECISIONS";
+const string kReqAllDecs = "REQALLDECS";
 const string kPreEmpted = "PREEMPTED";
 const string kAdopted = "ADOPTED";
 const string kPropose = "PROPOSE";
@@ -58,6 +59,7 @@ const string kAllClearDone = "DONE";
 // sleep values
 const time_t kGeneralSleep = 1000 * 1000;
 const time_t kBusyWaitSleep = 500 * 1000;
+const time_t kRecoveryWaitSleep = 100 * 1000;
 const time_t kAllClearSleep = 500 * 1000;
 
 // timeout values

@@ -14,6 +14,7 @@
 using namespace std;
 
 typedef pair<int, Proposal> SPtuple;
+pthread_mutex_t mode_lock;
 
 #define DEBUG
 
@@ -56,7 +57,13 @@ int Server::get_leader_port(const int server_id) {
 int Server::get_server_listen_port(const int server_id) {
     return server_listen_port_[server_id];
 }
-
+Status Server::get_mode(){
+    Status m;
+    pthread_mutex_lock(&mode_lock);
+    m = mode_;
+    pthread_mutex_unlock(&mode_lock);
+    return m;
+}
 int Server::get_client_listen_port(const int client_id) {
     return client_listen_port_[client_id];
 }
@@ -127,6 +134,12 @@ Scout* Server:: get_scout_object() {
     return scout_object_;
 }
 
+void Server::set_mode(Status m){
+    pthread_mutex_lock(&mode_lock);
+    mode_ = m;
+    pthread_mutex_unlock(&mode_lock);
+}
+
 void Server::set_pid(const int pid) {
     pid_ = pid;
 }
@@ -177,7 +190,7 @@ void Server::set_acceptor_ready(bool b) {
  * @return      id of client whose chat port matches param port
  * @return      -1 if param port is not the chat port of any client
  */
-int Server::IsClientChatPort(const int port) {
+ int Server::IsClientChatPort(const int port) {
     if (client_chat_port_map_.find(port) != client_chat_port_map_.end()) {
         return client_chat_port_map_[port];
     } else {
@@ -191,7 +204,7 @@ int Server::IsClientChatPort(const int port) {
  * @return      id of server whose replica port matches param port
  * @return      -1 if param port is not the replica port of any server
  */
-int Server::IsReplicaPort(const int port) {
+ int Server::IsReplicaPort(const int port) {
     if (replica_port_map_.find(port) != replica_port_map_.end()) {
         return replica_port_map_[port];
     } else {
@@ -205,7 +218,7 @@ int Server::IsReplicaPort(const int port) {
  * @return      id of server whose leader port matches param port
  * @return      -1 if param port is not the leader port of any server
  */
-int Server::IsLeaderPort(const int port) {
+ int Server::IsLeaderPort(const int port) {
     if (leader_port_map_.find(port) != leader_port_map_.end()) {
         return leader_port_map_[port];
     } else {
@@ -219,7 +232,7 @@ int Server::IsLeaderPort(const int port) {
  * @return      id of server whose acceptor port matches param port
  * @return      -1 if param port is not the acceptor port of any server
  */
-int Server::IsAcceptorPort(const int port) {
+ int Server::IsAcceptorPort(const int port) {
     if (acceptor_port_map_.find(port) != acceptor_port_map_.end()) {
         return acceptor_port_map_[port];
     } else {
@@ -231,7 +244,7 @@ int Server::IsAcceptorPort(const int port) {
  * reads ports-file and populates port related vectors/maps
  * @return true is ports-file was read successfully
  */
-bool Server::ReadPortsFile() {
+ bool Server::ReadPortsFile() {
     ifstream fin;
     fin.exceptions ( ifstream::failbit | ifstream::badbit );
     try {
@@ -290,13 +303,15 @@ bool Server::ReadPortsFile() {
  * @param  num_servers number of servers
  * @param  num_clients number of clients
  */
-void Server::Initialize(const int pid,
-                        const int num_servers,
-                        const int num_clients) {
+ void Server::Initialize(const int pid,
+    const int num_servers,
+    const int num_clients,
+    int mode) {
     set_pid(pid);
     set_primary_id(0);
     num_servers_ = num_servers;
     num_clients_ = num_clients;
+    mode_ = static_cast<Status>(mode);
 
     server_listen_port_.resize(num_servers_);
     client_listen_port_.resize(num_clients_);
@@ -325,7 +340,7 @@ void Server::Initialize(const int pid,
 /**
  * creates accept thread for commander
  */
-void Server::CommanderAcceptThread(Commander* C) {
+ void Server::CommanderAcceptThread(Commander* C) {
     pthread_t accept_connections_thread;
     CreateThread(AcceptConnectionsCommander, (void*)C, accept_connections_thread);
 }
@@ -333,7 +348,7 @@ void Server::CommanderAcceptThread(Commander* C) {
 /**
  * creates accept thread for scout
  */
-void Server::ScoutAcceptThread(Scout* SC) {
+ void Server::ScoutAcceptThread(Scout* SC) {
     pthread_t accept_connections_thread;
     CreateThread(AcceptConnectionsScout, (void*)SC, accept_connections_thread);
 }
@@ -372,7 +387,7 @@ void Server::FinishAllClear()
  * handles functions to be executed on receipt of new primary
  * @param new_primary_id id of the new primary elected
  */
-void Server::HandleNewPrimary(const int new_primary_id) {
+ void Server::HandleNewPrimary(const int new_primary_id) {
     set_primary_id(new_primary_id);
     
     if (get_pid() != get_primary_id())
@@ -445,7 +460,7 @@ int main(int argc, char *argv[]) {
     signal(SIGPIPE, SIG_IGN);
 
     Server S;
-    S.Initialize(atoi(argv[1]), atoi(argv[2]), atoi(argv[3]));
+    S.Initialize(atoi(argv[1]), atoi(argv[2]), atoi(argv[3]), atoi(argv[4]));
     if (!S.ReadPortsFile()) {
         return 1;
     }

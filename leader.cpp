@@ -86,7 +86,7 @@ void Leader::set_leader_active(const bool b) {
 /**
  * increments the value of ballot_num_
  */
-void Leader::IncrementBallotNum() {
+ void Leader::IncrementBallotNum() {
     Ballot b = get_ballot_num();
     b.seq_num++;
     set_ballot_num(b);
@@ -195,8 +195,8 @@ void* LeaderEntry(void *_S) {
 /**
  * function for performing leader related job
  */
-void Leader::LeaderMode()
-{
+ void Leader::LeaderMode()
+ {
     // scout
     pthread_t scout_thread;
     ScoutThreadArgument* arg = new ScoutThreadArgument;
