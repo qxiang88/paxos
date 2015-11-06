@@ -16,13 +16,13 @@ using namespace std;
 
 typedef pair<int, Proposal> SPtuple;
 
-template <typename Map>
-bool map_compare (Map const &lhs, Map const &rhs) {
-    // No predicate needed because there is operator== for pairs already.
-    return lhs.size() == rhs.size()
-           && std::equal(lhs.begin(), lhs.end(),
-                         rhs.begin());
-}
+// template <typename Map>
+// bool map_compare (Map const &lhs, Map const &rhs) {
+//     // No predicate needed because there is operator== for pairs already.
+//     return lhs.size() == rhs.size()
+//            && std::equal(lhs.begin(), lhs.end(),
+//                          rhs.begin());
+// }
 
 #define DEBUG
 
@@ -31,7 +31,16 @@ bool map_compare (Map const &lhs, Map const &rhs) {
 #else
 #  define D(x)
 #endif // DEBUG
-#
+
+bool map_compare(std::map<int, Proposal> &lhs, std::map<int, Proposal> &rhs) {
+    for (auto &l : lhs) {
+        if (rhs.find(l.first) == rhs.end())
+            return false;
+        else if (!(l.second == rhs.find(l.first)->second))
+            return false;
+    }
+    return true;
+}
 
 Replica::Replica(Server* _S) {
     S = _S;
@@ -209,14 +218,15 @@ void Replica::CheckReceivedAllDecisions(map<int, Proposal>& allDecisions)
 {
     if (map_compare (allDecisions, decisions_))
     {
-        // D(cout<<"SR"<<S->get_pid()<<": Has received every decision in all decisions("<<allDecisions.size()<<")"<<endl;)
+        D(cout << "SR" << S->get_pid()
+          << ": Has received every decision in all decisions(" << allDecisions.size() << ")" << endl;)
         S->set_all_clear(kReplicaRole, kAllClearDone);
         allDecisions.clear();
         allDecisions[-1] = Proposal("", "", "");
     }
     else
     {
-        // D(cout<<"SR"<<S->get_pid()<<": Has not received every decision"<<endl;)
+        D(cout << "SR" << S->get_pid() << ": Has not received every decision" << endl;)
     }
 }
 
@@ -260,14 +270,14 @@ void Replica::CreateFdSet(fd_set& fromset, vector<int> &fds,
 void Replica::ResetFD(const int fd, const int primary_id) {
     cout << fd << endl;
     if (fd == get_leader_fd(primary_id)) {
-        cout << "LEADER" << primary_id << endl;
+        // cout << S->get_pid() << "LEADER" << primary_id << endl;
         set_leader_fd(primary_id, -1);
         return;
     }
 
     for (int i = 0; i < S->get_num_servers(); ++i) {
         if (fd == get_commander_fd(i)) {
-            cout << "COMMANDER" << i << endl;
+            // cout << S->get_pid() << "COMMANDER" << i << endl;
             set_commander_fd(i, -1);
             return;
         }
@@ -275,7 +285,7 @@ void Replica::ResetFD(const int fd, const int primary_id) {
 
     for (int i = 0; i < S->get_num_clients(); ++i) {
         if (fd == get_client_chat_fd(i)) {
-            cout << "CLIENT" << i << endl;
+            // cout << S->get_pid() << "CLIENT" << i << endl;
             set_client_chat_fd(i, -1);
             return;
         }
@@ -305,25 +315,26 @@ void Replica::ReplicaMode(const int primary_id)
             return;
         }
 
+        CreateFdSet(fromset, fds, fd_max, primary_id);
+
         if (fd_max == INT_MIN) {
             usleep(kBusyWaitSleep);
             D(cout << "SR" << S->get_pid() << ": ERROR Unexpected fd_set empty" << endl;)
             continue;
         }
 
-        CreateFdSet(fromset, fds, fd_max, primary_id);
         //if just become not set, then propose buffered
-        // if ((S->get_all_clear(kReplicaRole) == kAllClearNotSet) && (!buffered_proposals_.empty()))
-        //     ProposeBuffered(primary_id);
-        // if ((S->get_all_clear(kReplicaRole) == kAllClearSet) && (allDecs.find(-1) == allDecs.end()) )
-        // {
-        //     CheckReceivedAllDecisions(allDecs);
-        // }
+        if ((S->get_all_clear(kReplicaRole) == kAllClearNotSet) && (!buffered_proposals_.empty()))
+            ProposeBuffered(primary_id);
+        if ((S->get_all_clear(kReplicaRole) == kAllClearSet) && (allDecs.find(-1) == allDecs.end()) )
+        {
+            CheckReceivedAllDecisions(allDecs);
+        }
 
         struct timeval timeout = kSelectTimeoutTimeval;
         int rv = select(fd_max + 1, &fromset, NULL, NULL, &timeout);
         if (rv == -1) { //error in select
-            D(cout << "SR" << S->get_pid() << ": ERROR in select()" << errno << endl;)
+            D(cout << "SR" << S->get_pid() << ": ERROR in select() errno=" << errno << " fdmax=" << fd_max << endl;)
         } else if (rv == 0) {
             // D(cout << "SR" << S->get_pid() << ": ERROR Unexpected select timeout" << endl;)
         } else {
@@ -443,6 +454,7 @@ void* ReplicaEntry(void *_S) {
         usleep(kGeneralSleep);
         usleep(kGeneralSleep);
 
+        R.S->set_replica_ready(true);
         R.ReplicaMode(primary_id);
     }
 

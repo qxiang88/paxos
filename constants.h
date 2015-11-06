@@ -35,6 +35,7 @@ const string kChatLog = "CHATLOG";
 const string kNewPrimary = "NEWPRIMARY";
 const string kTimeBomb = "TIMEBOMB";
 const string kKillMe = "KILLME";
+const string kGoAhead = "GOAHEAD";
 
 const string kP1a = "P1A";
 const string kP2a = "P2A";

@@ -364,6 +364,8 @@ void* ReceiveMessagesFromPrimary(void* _C) {
 }
 
 int main(int argc, char *argv[]) {
+    signal(SIGPIPE, SIG_IGN);
+
     Client C;
     C.Initialize(atoi(argv[1]), atoi(argv[2]), atoi(argv[3]));
     C.InitializeLocks();

@@ -134,8 +134,8 @@ void Leader::SendReplicasAllDecisions()
             set_replica_fd(i, -1);
         }
         else {
-            // D(cout << "SL" << S->get_pid()
-            //   << ": All Decisions sent to replica "<<i<<": " << msg << endl;)
+            D(cout << "SL" << S->get_pid()
+              << ": All Decisions sent to replica "<<i<<": " << msg << endl;)
         }
     }
 }
@@ -187,6 +187,7 @@ void* LeaderEntry(void *_S) {
     usleep(kGeneralSleep);
     usleep(kGeneralSleep);
 
+    L.S->set_leader_ready(true);
     L.LeaderMode();
     return NULL;
 }
@@ -220,7 +221,7 @@ void Leader::LeaderMode()
                     pthread_join(*cit, &status);
                 }
                 commanders_.clear();
-                // D(cout<<"SL"<<S->get_pid()<<" :Leader joined all commanders"<<endl;)
+                D(cout<<"SL"<<S->get_pid()<<" :Leader joined all commanders"<<endl;)
             }
         }
 
@@ -275,12 +276,9 @@ void Leader::LeaderMode()
                                 unordered_set<Triple> pvalues;
                                 if (token.size() == 3)
                                 {
-                                    cout<<"HERE"<<endl;
                                     pvalues = stringToTripleSet(token[2]);
                                     proposals_ = pairxor(proposals_, pmax(pvalues));
                                 }
-
-                                cout<<proposals_.size()<<endl;
 
                                 pthread_t commander_thread[proposals_.size()];
                                 int i = 0;

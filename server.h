@@ -32,7 +32,11 @@ public:
     void AllClearPhase();
     void FinishAllClear();
     void HandleNewPrimary(const int new_primary_id);
-    
+    void SendGoAheadToPrimary();
+
+    bool get_leader_ready();
+    bool get_replica_ready();
+    bool get_acceptor_ready();
     int get_pid();
     int get_num_servers();
     int get_num_clients();
@@ -53,18 +57,24 @@ public:
     int get_master_fd();
 
 
+    void set_leader_ready(bool b);
+    void set_replica_ready(bool b);
+    void set_acceptor_ready(bool b);
     void set_pid(const int pid);
     void set_master_fd(const int fd);
     void set_primary_id(const int primary_id);
     void set_scout_object();
     void set_all_clear(string, string);
 
-
 private:
     int pid_;   // server's ID
     int num_servers_;
     int num_clients_;
     int primary_id_;
+
+    bool leader_ready_;
+    bool acceptor_ready_;
+    bool replica_ready_;
 
     int master_fd_;
 

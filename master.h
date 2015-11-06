@@ -39,6 +39,7 @@ public:
     void ElectNewPrimary();
     void InformClientsAboutNewPrimary();
     void InformServersAboutNewPrimary();
+    void WaitForGoAhead();
 
     int get_server_fd(const int server_id);
     int get_client_fd(const int client_id);

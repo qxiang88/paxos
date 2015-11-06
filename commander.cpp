@@ -77,6 +77,9 @@ void Commander::SendToServers(const string& type, const string& msg)
 {
     for (int i = 0; i < S->get_num_servers(); i++)
     {
+        if(get_replica_fd(i) == -1)
+            continue;
+
         if (send(get_replica_fd(i), msg.c_str(), msg.size(), 0) == -1) {
             D(cout << "SC" << S->get_pid()
               << ": ERROR in sending decision to replica S" << (i) << endl;)

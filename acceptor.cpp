@@ -68,7 +68,6 @@ void Acceptor::AddToCommanderFDSet(const int fd) {
  * @param fd fd to be removed
  */
 void Acceptor::RemoveFromCommanderFDSet(const int fd) {
-    close(fd);
     commander_fd_set_.erase(fd);
 }
 
@@ -78,9 +77,10 @@ void Acceptor::RemoveFromCommanderFDSet(const int fd) {
  * @param cfds_vec [out] vector correponding to the constructed fd_set
  * @param fd_max   [out] maximum value of fd in the constructed fd_set
  */
-void Acceptor::GetCommanderFdSet(fd_set& cfds_set, int& fd_max)
+void Acceptor::GetCommanderFdSet(fd_set& cfds_set, int& fd_max, std::vector<int> &cfds_vec)
 {
     int fd_temp;
+    cfds_vec.clear();
     fd_max = INT_MIN;
     set<int> local_set = get_commander_fd_set();
     FD_ZERO(&cfds_set);
@@ -91,6 +91,7 @@ void Acceptor::GetCommanderFdSet(fd_set& cfds_set, int& fd_max)
         {
             FD_SET(fd_temp, &cfds_set);
             fd_max = max(fd_max, fd_temp);
+            cfds_vec.push_back(fd_temp);
         }
     }
 }
@@ -104,7 +105,7 @@ void Acceptor::SendBackOwnFD(const int fd) {
     string msg = to_string(fd);
     if (send(fd, msg.c_str(), msg.size(), 0) == -1) {
         D(cout << "SA" << S->get_pid() << ": ERROR: Cannot send fd to commander" << endl;)
-        //TODO: delete this fd from the commander fd set?
+        close(fd);
         RemoveFromCommanderFDSet(fd);
     } else {
         D(cout << "SA" << S->get_pid() << ": fd sent to commander" << endl;)
@@ -126,6 +127,7 @@ void Acceptor::Unicast(const string &type, const string& msg,
             close(serv_fd);
             set_scout_fd(primary_id, -1);
         } else {
+            close(serv_fd);
             RemoveFromCommanderFDSet(serv_fd);
         }
     }
@@ -166,23 +168,25 @@ void Acceptor::SendP2b(const Ballot& b, int return_fd, const int primary_id)
 void Acceptor::AcceptorMode(const int primary_id)
 {
     int num_bytes;
-
+    vector<int> fds;
     fd_set recv_from;
 
     while (true) {  // always listen to messages from the acceptors
         if (primary_id != S->get_primary_id()) {   // new primary has been elected
+            close(get_scout_fd(primary_id));
             set_scout_fd(primary_id, -1);
             return;
         }
 
         int fd_max = INT_MIN, fd_temp;
-        GetCommanderFdSet(recv_from, fd_max);
+        GetCommanderFdSet(recv_from, fd_max, fds);
 
         fd_temp = get_scout_fd(primary_id);
         if (fd_temp != -1)
         {
             FD_SET(fd_temp, &recv_from);
             fd_max = max(fd_max, fd_temp);
+            fds.push_back(fd_temp);
         }
 
         if (fd_max == INT_MIN) {
@@ -194,28 +198,32 @@ void Acceptor::AcceptorMode(const int primary_id)
         int rv = select(fd_max + 1, &recv_from, NULL, NULL, &timeout);
 
         if (rv == -1) { //error in select
-            D(cout << "SA" << S->get_pid() << ": ERROR in select() for Acceptor" << endl;)
+            D(cout << "SA" << S->get_pid() << ": ERROR in select() for Acceptor errno=" << errno << "fd_max=" << fd_max << endl;)
         } else if (rv == 0) {
             // D(cout << "SA" << S->get_pid() << ": Unexpected select timeout in Acceptor" << endl;)
         } else {
-            for (int i = 0; i <= fd_max; i++) {
-                if (FD_ISSET(i, &recv_from)) { // we got one!!
+            for (int i = 0; i < fds.size(); i++) {
+                if (FD_ISSET(fds[i], &recv_from)) { // we got one!!
                     char buf[kMaxDataSize];
-                    if ((num_bytes = recv(i, buf, kMaxDataSize - 1, 0)) == -1) {
+                    if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1) {
                         D(cout << "SA" << S->get_pid() << ": ERROR in receiving from scout or commander" << endl;)
-                        if (i == get_scout_fd(primary_id)) {
-                            close(i);
+                        if (fds[i] == get_scout_fd(primary_id)) {
+                            cout << "Scout" << endl;
+                            close(fds[i]);
                             set_scout_fd(primary_id, -1);
-                        } else { // scout fd
-                            RemoveFromCommanderFDSet(i);
+                        } else {
+                            close(fds[i]);
+                            RemoveFromCommanderFDSet(fds[i]);
                         }
                     } else if (num_bytes == 0) {     //connection closed
                         D(cout << "SA" << S->get_pid() << ": Connection closed by scout or commander." << endl;)
                         if (i == get_scout_fd(primary_id)) {
-                            close(i);
+                            cout << "Scout" << endl;
+                            close(fds[i]);
                             set_scout_fd(primary_id, -1);
-                        } else { // scout fd
-                            RemoveFromCommanderFDSet(i);
+                        } else {
+                            close(fds[i]);
+                            RemoveFromCommanderFDSet(fds[i]);
                         }
                     } else {
                         buf[num_bytes] = '\0';
@@ -242,6 +250,9 @@ void Acceptor::AcceptorMode(const int primary_id)
                                     accepted_.insert(recvd_triple);
                                 }
                                 SendP2b(get_best_ballot_num(), return_fd, primary_id);
+                                //TODO: Check if following is correct
+                                // close(fds[i]);
+                                // RemoveFromCommanderFDSet(fds[i]);
                             }
                             else {    //other messages
                                 D(cout << "SA" << S->get_pid() << ": Unexpected message received: " << msg << endl;)
@@ -283,7 +294,8 @@ void* AcceptorEntry(void *_S) {
         usleep(kGeneralSleep);
         usleep(kGeneralSleep);
         usleep(kGeneralSleep);
-        
+
+        A.S->set_acceptor_ready(true);
         A.AcceptorMode(primary_id);
     }
 }

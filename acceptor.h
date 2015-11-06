@@ -16,7 +16,7 @@ void *AcceptorEntry(void *_S);
 class Acceptor {
 public:
     bool ConnectToScout(const int server_id);
-    void GetCommanderFdSet(fd_set&, int&);
+    void GetCommanderFdSet(fd_set&, int&, std::vector<int> &cfds_vec);
     void AddToCommanderFDSet(const int fd);
     void RemoveFromCommanderFDSet(const int fd);
     void SendBackOwnFD(const int fd);

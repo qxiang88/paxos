@@ -107,6 +107,17 @@ string Server::get_all_clear(string role)
     return temp;
 }
 
+bool Server::get_leader_ready() {
+    return leader_ready_;
+}
+
+bool Server::get_replica_ready() {
+    return replica_ready_;
+}
+
+bool Server::get_acceptor_ready() {
+    return acceptor_ready_;
+}
 
 int Server::get_num_clients() {
     return num_clients_;
@@ -147,6 +158,19 @@ void Server::set_all_clear(string role, string status)
         pthread_mutex_unlock(&all_clear_lock);
     }
 }
+
+void Server::set_leader_ready(bool b) {
+    leader_ready_ = true;
+}
+
+void Server::set_replica_ready(bool b) {
+    replica_ready_ = true;
+}
+
+void Server::set_acceptor_ready(bool b) {
+    acceptor_ready_ = true;
+}
+
 /**
  * checks if given port corresponds to a client's chat port
  * @param  port port number to be checked
@@ -292,6 +316,10 @@ void Server::Initialize(const int pid,
 
     set_all_clear(kLeaderRole, kAllClearNotSet);
     set_all_clear(kReplicaRole, kAllClearNotSet);
+
+    set_leader_ready(false);
+    set_replica_ready(false);
+    set_acceptor_ready(false);
 }
 
 /**
@@ -312,7 +340,7 @@ void Server::ScoutAcceptThread(Scout* SC) {
 
 void Server::AllClearPhase()
 {
-    sleep(2); //for testing allclear
+    // sleep(2); //for testing allclear
     set_all_clear(kReplicaRole, kAllClearSet);
 
     if (get_pid() == get_primary_id())
@@ -325,7 +353,7 @@ void Server::AllClearPhase()
         usleep(kAllClearSleep);
     }
 
-    string message = kAllClearDone + kMessageDelim;
+    string message = kAllClearDone + kInternalDelim + kMessageDelim;
     if (send(get_master_fd(), message.c_str(), message.size(), 0) == -1) {
         D(cout << "S" << get_pid() << " : ERROR: Cannot send all clear done to master" <<  endl;)
     } else {
@@ -346,16 +374,35 @@ void Server::FinishAllClear()
  */
 void Server::HandleNewPrimary(const int new_primary_id) {
     set_primary_id(new_primary_id);
+    
+    if (get_pid() != get_primary_id())
+        return;
+    
+    Commander *C = new Commander(this, get_num_servers());
+    CommanderAcceptThread(C);
 
-    if (get_pid() == get_primary_id()) {
-        Commander *C = new Commander(this, get_num_servers());
-        CommanderAcceptThread(C);
+    set_scout_object();
+    ScoutAcceptThread(get_scout_object());
 
-        set_scout_object();
-        ScoutAcceptThread(get_scout_object());
+    pthread_t leader_thread;
+    CreateThread(LeaderEntry, (void*)this, leader_thread);
 
-        pthread_t leader_thread;
-        CreateThread(LeaderEntry, (void*)this, leader_thread);
+    while (!get_leader_ready() || !get_replica_ready() || !get_acceptor_ready()) {
+        usleep(kBusyWaitSleep);
+    }
+
+    set_leader_ready(false);
+    set_acceptor_ready(false);
+    set_replica_ready(false);
+    SendGoAheadToPrimary();
+}
+
+void Server::SendGoAheadToPrimary() {
+    string message = kGoAhead + kInternalDelim + kMessageDelim;
+    if (send(get_master_fd(), message.c_str(), message.size(), 0) == -1) {
+        D(cout << "S" << get_pid() << " : ERROR: Cannot send GOAHEAD done to master" <<  endl;)
+    } else {
+        D(cout << "S" << get_pid() << " : GOAHEAD sent to master" << endl;)
     }
 }
 
@@ -395,6 +442,8 @@ void* ReceiveMessagesFromMaster(void* _S ) {
 }
 
 int main(int argc, char *argv[]) {
+    signal(SIGPIPE, SIG_IGN);
+
     Server S;
     S.Initialize(atoi(argv[1]), atoi(argv[2]), atoi(argv[3]));
     if (!S.ReadPortsFile()) {

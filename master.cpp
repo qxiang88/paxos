@@ -173,12 +173,9 @@ void Master::ReadTest() {
             if (!SpawnClients(num_clients_))
                 return;
             usleep(kGeneralSleep);
+            usleep(kGeneralSleep);
         }
         if (keyword == kSendMessage) {
-            // usleep(kGeneralSleep);
-            // usleep(kGeneralSleep);
-            // usleep(kGeneralSleep);
-
             int client_id;
             iss >> client_id;
             string chat_message;
@@ -186,24 +183,26 @@ void Master::ReadTest() {
             string message;
             ConstructChatMessage(chat_message, message);
             SendMessageToClient(client_id, message);
+            // usleep(kGeneralSleep);
+            // usleep(kGeneralSleep);
         }
         if (keyword == kCrashServer) {
-            // usleep(kGeneralSleep);
-            // usleep(kGeneralSleep);
-            // usleep(kGeneralSleep);
-
             int server_id;
             iss >> server_id;
             CrashServer(server_id);
-            if (server_id == get_primary_id())
+            if (server_id == get_primary_id()) {
                 NewPrimaryElection();
-            usleep(kGeneralSleep);
-            usleep(kGeneralSleep);
+                WaitForGoAhead();
+            }
         }
         if (keyword == kRestartServer) {
 
         }
         if (keyword == kAllClear) {
+            usleep(kGeneralSleep);
+            usleep(kGeneralSleep);
+            usleep(kGeneralSleep);
+            usleep(kGeneralSleep);
             // D(cout<<endl<<endl<<"All Clear Message being sent"<<endl<<endl;)
             SendAllClearToServers(kAllClear); //sends to primary server
             WaitForAllClearDone();
@@ -220,7 +219,6 @@ void Master::ReadTest() {
             usleep(kGeneralSleep);
         }
         if (keyword == kPrintChatLog) {
-            usleep(5000 * 1000);
             int client_id;
             iss >> client_id;
             string message = kChatLog + kInternalDelim;
@@ -233,7 +231,32 @@ void Master::ReadTest() {
 }
 
 void Master::ConstructAllClearMessage(string &message, const string& type) {
-    message = type + kMessageDelim;
+    message = type + kInternalDelim + kMessageDelim;
+}
+
+void Master::WaitForGoAhead() {
+    char buf[kMaxDataSize];
+    int num_bytes;
+    if ((num_bytes = recv(get_server_fd(get_primary_id()), buf, kMaxDataSize - 1, 0)) == -1) {
+        D(cout << "M  : ERROR in receiving GOAHEAD from primary S" << get_primary_id() << endl;)
+    }
+    else if (num_bytes == 0)
+    {   //connection closed
+        D(cout << "M  : ERROR Connection closed by primary S" << get_primary_id() << endl;)
+    }
+    else
+    {
+        buf[num_bytes] = '\0';
+        std::vector<string> message = split(string(buf), kMessageDelim[0]);
+        for (const auto &msg : message)
+        {
+            std::vector<string> token = split(string(msg), kInternalDelim[0]);
+            if (token[0] == kGoAhead)
+            {
+                D(cout << "M  : GOAHEAD received from primary S" << get_primary_id() << endl;)
+            }
+        }
+    }
 }
 
 void Master::WaitForAllClearDone()
@@ -242,11 +265,21 @@ void Master::WaitForAllClearDone()
     fd_set server_set;
     int fd_max, num_bytes;
     int num_servers = get_num_servers();
-    int waitfor = num_servers;
+
     std::vector<int> fds;
+    int waitfor = 0;
+    for (int i = 0; i < num_servers; ++i) {
+        if (get_server_status(i) != DEAD)
+            waitfor++;
+    }
 
     while (waitfor) {  // always listen to messages from the acceptors
         GetServerFdSet(server_set, fds, fd_max);
+
+        if (fd_max == INT_MIN) {
+            usleep(kBusyWaitSleep);
+            continue;
+        }
         int rv = select(fd_max + 1, &server_set, NULL, NULL, NULL);
 
         if (rv == -1) { //error in select
@@ -254,9 +287,7 @@ void Master::WaitForAllClearDone()
         } else if (rv == 0) {
             D(cout << "M  : ERROR: Unexpected timeout in select() while waiting for all clear" << endl;)
         } else {
-            for (int i = 0; i < get_num_servers(); i++) {
-                if(get_server_status(i) == DEAD)
-                    continue;
+            for (int i = 0; i < fds.size(); i++) {
                 if (FD_ISSET(fds[i], &server_set)) { // we got one!!
                     char buf[kMaxDataSize];
                     if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1) {
@@ -275,7 +306,7 @@ void Master::WaitForAllClearDone()
                             std::vector<string> token = split(string(msg), kInternalDelim[0]);
                             if (token[0] == kAllClearDone)
                             {
-                                // D(cout<<"M: S"<<i<<" is allClearDone"<<endl;)
+                                D(cout << "M  : S" << i << " is allClearDone" << endl;)
                                 waitfor--;
                             }
                         }
@@ -633,6 +664,8 @@ void Master::SendMessageToServer(const int server_id, const string & message) {
 }
 
 int main() {
+    signal(SIGPIPE, SIG_IGN);
+
     Master M;
     M.ReadTest();
 
