@@ -551,11 +551,11 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
             NULL
         };
         status = posix_spawn(&pid,
-           (char*)kServerExecutable.c_str(),
-           NULL,
-           NULL,
-           argv,
-           environ);
+         (char*)kServerExecutable.c_str(),
+         NULL,
+         NULL,
+         argv,
+         environ);
         if (status == 0) {
             D(cout << "M  : Spawed server S" << i << endl;)
             set_server_pid(i, pid);
@@ -712,7 +712,7 @@ int main() {
     M.ReadTest();
 
     // while(1);
-    sleep(10);
+    usleep(8000*1000);
     cout<<"Master crashing all"<<endl;
     M.KillAllServers();
     M.KillAllClients();
