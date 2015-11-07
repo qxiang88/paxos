@@ -17,9 +17,9 @@ void* ScoutMode(void* _rcv_thread_arg);
 
 class Scout {
 public:
-    void SendToServers(const string& type, const string& msg);
+    int SendToServers(const string& type, const string& msg);
     void GetAcceptorFdSet(fd_set&, vector<int>&, int&);
-    void SendP1a(const Ballot &b);
+    int SendP1a(const Ballot &b);
     void SendAdopted(const Ballot& recvd_ballot, unordered_set<Triple> pvalues);
     void SendPreEmpted(const Ballot& b);
     void Unicast(const string &type, const string& msg);

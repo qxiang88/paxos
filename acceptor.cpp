@@ -105,7 +105,6 @@ void Acceptor::set_best_ballot_num(const Ballot &b) {
     string msg = to_string(fd);
     if(fd==-1)
     {
-        cout<<"Send failed as fd=-1 in SendBackOwnFD"<<endl;
         return;
     }
     if (send(fd, msg.c_str(), msg.size(), 0) == -1) {
@@ -128,7 +127,6 @@ void Acceptor::Unicast(const string &type, const string& msg,
 
     if(serv_fd==-1)
     {
-        cout<<"Send failed as fd=-1 in acceptor unicast"<<endl;
         return;
     }
     if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {

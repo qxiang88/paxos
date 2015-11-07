@@ -115,6 +115,7 @@ struct CommanderThreadArgument {
 struct ScoutThreadArgument {
     Scout *SC;
     Ballot ball;
+    time_t sleep_time;
 };
 
 #endif //SERVER_H_

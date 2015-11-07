@@ -15,6 +15,7 @@ struct FinalChatLog {
     string sender_index;
     string body;
 
+    FinalChatLog() {}
     FinalChatLog(const string &seq_num,
                  const string &sender_idx,
                  const string &body)
@@ -73,7 +74,7 @@ private:
     int my_listen_port_;
 
     std::vector<string> chat_list_;
-    std::vector<FinalChatLog> final_chat_log_;
+    std::map<int, FinalChatLog> final_chat_log_;
     std::unordered_set<int> decided_chat_ids_;
 };
 

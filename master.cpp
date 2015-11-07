@@ -184,18 +184,16 @@ void Master::set_server_status(const int server_id, const Status s) {
             string message;
             ConstructChatMessage(chat_message, message);
             SendMessageToClient(client_id, message);
-            // usleep(kGeneralSleep);
+            usleep(kGeneralSleep);
             // usleep(kGeneralSleep);
         }
         if (keyword == kCrashServer) {
             int server_id;
             iss >> server_id;
             CrashServer(server_id);
-            D(cout<<"M : crashed server "<<server_id<<endl;)
             if (server_id == get_primary_id()) {
                 NewPrimaryElection();
                 WaitForGoAhead();
-                InformClientsAboutNewPrimary();
             }
         }
         if (keyword == kRestartServer) {
@@ -204,9 +202,8 @@ void Master::set_server_status(const int server_id, const Status s) {
         if (keyword == kAllClear) {
             usleep(kGeneralSleep);
             usleep(kGeneralSleep);
-            usleep(kGeneralSleep);
-            usleep(kGeneralSleep);
-            D(cout<<endl<<endl<<"All Clear Message being sent"<<endl<<endl;)
+            // usleep(kGeneralSleep);
+            // usleep(kGeneralSleep);
             SendAllClearToServers(kAllClear); //sends to primary server
             WaitForAllClearDone();
             SendAllClearToServers(kAllClearRemove); //sends to primary server
@@ -249,13 +246,11 @@ void Master::WaitForGoAhead() {
     }
     else
     {
-        D(cout << "M  : Received something" << endl;)
         buf[num_bytes] = '\0';
         std::vector<string> message = split(string(buf), kMessageDelim[0]);
         for (const auto &msg : message)
         {
             std::vector<string> token = split(string(msg), kInternalDelim[0]);
-            cout<<msg<<endl;
             if (token[0] == kGoAhead)
             {
                 D(cout << "M  : GOAHEAD received from primary S" << get_primary_id() << endl;)
@@ -355,7 +350,6 @@ void Master::SendAllClearToServers(const string& type)
             SendMessageToServer(i, message);
         }
     }
-    D(cout << "M  : " << type << " sent to all servers" << endl;)
 }
 
 void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, int& fd_max)
@@ -418,6 +412,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
     InformServersAboutNewPrimary();
     usleep(kGeneralSleep);
     usleep(kGeneralSleep);
+    InformClientsAboutNewPrimary();
 }
 
 /**

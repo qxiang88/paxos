@@ -180,7 +180,7 @@ void Replica::Unicast(const string &type, const string& msg, const int primary_i
     for (auto it = decisions_.begin(); it != decisions_.end(); it++)
     {
         if (it->second == p && it->first < get_slot_num())
-        {   //think why not increase in loop
+        {
             IncrementSlotNum();
             return;
         }
@@ -342,7 +342,6 @@ void Replica::CheckAndDecrementWaitFor(vector<int>& waitfor, const int& s_fd)
                 if (waitfor[j] == i)
                 {
                     waitfor.erase(waitfor.begin() + j);
-                    D(cout<<"decremented waitfor"<<endl;)
                     return;
                 }
             }
@@ -371,12 +370,9 @@ void Replica::CheckAndDecrementWaitFor(vector<int>& waitfor, const int& s_fd)
     map<int, Proposal> allDecs;
     allDecs[-1] = Proposal("", "", "");
 
-    S->set_replica_ready(false);
     while (true) {  // always listen to messages from the acceptors
 
         if (primary_id != S->get_primary_id()) {   // new primary elected
-            cout<<endl<<"replica ready:"<<S->get_replica_ready()<<endl;
-            cout<<S->get_pid()<<"replicamode new primary detected"<<endl;
             set_commander_fd(primary_id, -1);
             set_scout_fd(primary_id, -1);
             set_leader_fd(primary_id, -1);
@@ -494,6 +490,7 @@ void Replica::CheckAndDecrementWaitFor(vector<int>& waitfor, const int& s_fd)
                             {
                                 D(cout << "SR" << S->get_pid() << ": Request for all decisions message received: " << msg <<  endl;)
                                 SendDecisionsResponse(fds[i], primary_id);
+                                ResendProposals(primary_id);
                             }
                             else {    //other messages
                                 D(cout << "SR" << S->get_pid() << ": ERROR Unexpected message received: " << msg << endl;)
@@ -506,6 +503,16 @@ void Replica::CheckAndDecrementWaitFor(vector<int>& waitfor, const int& s_fd)
     }
 }
 
+void Replica::ResendProposals(const int primary_id) {
+    if(S->get_pid() != primary_id)
+        return;
+
+    for(auto &p: proposals_) {
+        if(decisions_.find(p.first) == decisions_.end()) {
+            Propose(p.second, primary_id);
+        }
+    }
+}
 
 void Replica::GetReplicaFdSet(fd_set& replica_fd_set, vector<int>& fds, int& fd_max)
 {

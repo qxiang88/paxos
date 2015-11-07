@@ -205,6 +205,7 @@ void Leader::SendReplicasAllDecisions()
     ScoutThreadArgument* arg = new ScoutThreadArgument;
     arg->SC = S->get_scout_object();
     arg->ball = get_ballot_num();
+    arg->sleep_time = 0;
     CreateThread(ScoutMode, (void*)arg, scout_thread);
 
     int num_servers = S->get_num_servers();
@@ -255,8 +256,8 @@ void Leader::SendReplicasAllDecisions()
                             if (token[0] == kPropose)
                             {
                                 D(cout << "SL" << S->get_pid() << ": Propose message received: " << msg <<  endl;)
-                                if (proposals_.find(stoi(token[1])) == proposals_.end())
-                                {
+                                // if (proposals_.find(stoi(token[1])) == proposals_.end())
+                                // {
                                     proposals_[stoi(token[1])] = stringToProposal(token[2]);
                                     if (get_leader_active())
                                     {
@@ -270,7 +271,7 @@ void Leader::SendReplicasAllDecisions()
                                         CreateThread(CommanderMode, (void*)arg, commander_thread);
                                         commanders_.push_back(commander_thread);
                                     }
-                                }
+                                // }
                             }
                             else if (token[0] == kAdopted)
                             {
@@ -282,12 +283,10 @@ void Leader::SendReplicasAllDecisions()
                                     pvalues = stringToTripleSet(token[2]);
                                     proposals_ = pairxor(proposals_, pmax(pvalues));
                                 }
-                                cout<<"1"<<endl;
                                 pthread_t commander_thread[proposals_.size()];
                                 int i = 0;
                                 for (auto it = proposals_.begin(); it != proposals_.end(); it++)
                                 {
-                                    cout<<"2"<<endl;    
                                     // commander
                                     Commander *C = new Commander(S);
                                     CommanderThreadArgument* arg = new CommanderThreadArgument;
@@ -296,11 +295,9 @@ void Leader::SendReplicasAllDecisions()
                                     arg->toSend = tempt;
                                     CreateThread(CommanderMode, (void*)arg, commander_thread[i]);
                                     commanders_.push_back(commander_thread[i]);
-                                    cout<<"created a commander"<<endl;    
                                     i++;
-                                    set_leader_active(true);
-                                    cout<<"set leader active true"<<endl;    
                                 }
+                                set_leader_active(true);
                             }
                             else if (token[0] == kPreEmpted)
                             {
@@ -315,6 +312,17 @@ void Leader::SendReplicasAllDecisions()
                                     ScoutThreadArgument* arg = new ScoutThreadArgument;
                                     arg->SC = S->get_scout_object();
                                     arg->ball = get_ballot_num();
+                                    arg->sleep_time = 0;
+                                    CreateThread(ScoutMode, (void*)arg, scout_thread);
+                                }
+                                else if(recvd_b == get_ballot_num())     // minority of acceptors alive
+                                {
+                                    set_leader_active(false);
+                                    // scout
+                                    ScoutThreadArgument* arg = new ScoutThreadArgument;
+                                    arg->SC = S->get_scout_object();
+                                    arg->ball = get_ballot_num();
+                                    arg->sleep_time = 2*kGeneralSleep;
                                     CreateThread(ScoutMode, (void*)arg, scout_thread);
                                 }
                             }

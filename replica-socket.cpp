@@ -29,7 +29,7 @@ extern void sigchld_handler(int s);
  * function for replica's accept connections thread
  * @param _S Pointer to server class object
  */
- void* AcceptConnectionsReplica(void* _R) {
+void* AcceptConnectionsReplica(void* _R) {
     Replica *R = (Replica*)_R;
 
     int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
@@ -46,33 +46,33 @@ extern void sigchld_handler(int s);
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
     if ((rv = getaddrinfo(NULL, std::to_string(R->S->get_replica_listen_port(R->S->get_pid())).c_str(),
-      &hints, &servinfo)) != 0) {
+                          &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-    exit (1);
-}
+        exit (1);
+    }
 
     // loop through all the results and bind to the first we can
-for (l = servinfo; l != NULL; l = l->ai_next) {
-    if ((sockfd = socket(l->ai_family, l->ai_socktype,
-       l->ai_protocol)) == -1) {
-        perror("server: socket ERROR");
-    continue;
-}
+    for (l = servinfo; l != NULL; l = l->ai_next) {
+        if ((sockfd = socket(l->ai_family, l->ai_socktype,
+                             l->ai_protocol)) == -1) {
+            perror("server: socket ERROR");
+            continue;
+        }
 
-if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
- sizeof(int)) == -1) {
-    perror("setsockopt ERROR");
-exit(1);
-}
+        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
+                       sizeof(int)) == -1) {
+            perror("setsockopt ERROR");
+            exit(1);
+        }
 
-if (bind(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
-    close(sockfd);
-    perror("server: bind ERROR");
-    continue;
-}
+        if (bind(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
+            close(sockfd);
+            perror("server: bind ERROR");
+            continue;
+        }
 
-break;
-}
+        break;
+    }
     freeaddrinfo(servinfo); // all done with this structure
 
     if (l == NULL) {
@@ -117,9 +117,9 @@ break;
                 if (process_id != -1) { //incoming connection from chat port of a client
                     R->set_replica_fd(process_id, new_fd);
                 }
-                else{
+                else {
                     D(cout << "SR" << R->S->get_pid() << ": ERROR: Unexpected connect request from port "
-                        << incoming_port << endl;)
+                      << incoming_port << endl;)
                 }
             }
         }
@@ -132,7 +132,7 @@ break;
  * @param server_id id of server whose commander to connect to
  * @return  true if connection was successfull or already connected
  */
- bool Replica::ConnectToCommander(const int server_id) {
+bool Replica::ConnectToCommander(const int server_id) {
     // if (get_commander_fd(server_id) != -1) return true;
 
     int sockfd;  // listen on sock_fd, new connection on new_fd
@@ -147,34 +147,34 @@ break;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
     if ((rv = getaddrinfo(NULL, std::to_string(S->get_replica_port(S->get_pid())).c_str(),
-      &hints, &clientinfo)) != 0) {
+                          &hints, &clientinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-    exit (1);
-}
+        exit (1);
+    }
 
     // loop through all the results and bind to the first we can
-for (l = clientinfo; l != NULL; l = l->ai_next)
-{
-    if ((sockfd = socket(l->ai_family, l->ai_socktype,
-       l->ai_protocol)) == -1) {
-        perror("client: socket ERROR");
-    continue;
-}
+    for (l = clientinfo; l != NULL; l = l->ai_next)
+    {
+        if ((sockfd = socket(l->ai_family, l->ai_socktype,
+                             l->ai_protocol)) == -1) {
+            perror("client: socket ERROR");
+            continue;
+        }
 
-if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
- sizeof(int)) == -1) {
-    perror("setsockopt ERROR");
-exit(1);
-}
+        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
+                       sizeof(int)) == -1) {
+            perror("setsockopt ERROR");
+            exit(1);
+        }
 
-if (bind(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
-    close(sockfd);
-    perror("client: bind ERROR");
-    continue;
-}
+        if (bind(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
+            close(sockfd);
+            perror("client: bind ERROR");
+            continue;
+        }
 
-break;
-}
+        break;
+    }
     freeaddrinfo(clientinfo); // all done with this structure
     if (l == NULL)  {
         fprintf(stderr, "client: failed to bind\n");
@@ -200,26 +200,26 @@ break;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
     if ((rv = getaddrinfo(NULL, std::to_string(S->get_commander_listen_port(server_id)).c_str(),
-      &hints, &servinfo)) != 0) {
+                          &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-    return false;
-}
-    // loop through all the results and connect to the first we can
-for (l = servinfo; l != NULL; l = l->ai_next)
-{
-    errno = 0;
-    if (connect(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
-        close(sockfd);
-            // if (errno == EBADF) cout << errno << endl;
-        continue;
+        return false;
     }
+    // loop through all the results and connect to the first we can
+    for (l = servinfo; l != NULL; l = l->ai_next)
+    {
+        errno = 0;
+        if (connect(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
+            close(sockfd);
+            // if (errno == EBADF) cout << errno << endl;
+            continue;
+        }
 
-    break;
-}
-if (l == NULL) {
-    cout<<S->get_pid()<<"HH"<<endl;
-    return false;
-}
+        break;
+    }
+    if (l == NULL) {
+        cout << S->get_pid() << "HH" << endl;
+        return false;
+    }
     // int outgoing_port = ntohs(return_port_no((struct sockaddr *)l->ai_addr));
     freeaddrinfo(servinfo); // all done with this structure
     set_commander_fd(server_id, sockfd);
@@ -231,7 +231,7 @@ if (l == NULL) {
  * @param server_id id of server whose scout to connect to
  * @return  true if connection was successfull or already connected
  */
- bool Replica::ConnectToScout(const int server_id) {
+bool Replica::ConnectToScout(const int server_id) {
     // if (get_scout_fd(server_id) != -1) return true;
 
     int sockfd;  // listen on sock_fd, new connection on new_fd
@@ -246,34 +246,34 @@ if (l == NULL) {
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
     if ((rv = getaddrinfo(NULL, std::to_string(S->get_replica_port(S->get_pid())).c_str(),
-      &hints, &clientinfo)) != 0) {
+                          &hints, &clientinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-    exit (1);
-}
+        exit (1);
+    }
 
     // loop through all the results and bind to the first we can
-for (l = clientinfo; l != NULL; l = l->ai_next)
-{
-    if ((sockfd = socket(l->ai_family, l->ai_socktype,
-       l->ai_protocol)) == -1) {
-        perror("client: socket ERROR");
-    continue;
-}
+    for (l = clientinfo; l != NULL; l = l->ai_next)
+    {
+        if ((sockfd = socket(l->ai_family, l->ai_socktype,
+                             l->ai_protocol)) == -1) {
+            perror("client: socket ERROR");
+            continue;
+        }
 
-if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
- sizeof(int)) == -1) {
-    perror("setsockopt ERROR");
-exit(1);
-}
+        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
+                       sizeof(int)) == -1) {
+            perror("setsockopt ERROR");
+            exit(1);
+        }
 
-if (bind(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
-    close(sockfd);
-    perror("client: bind ERROR");
-    continue;
-}
+        if (bind(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
+            close(sockfd);
+            perror("client: bind ERROR");
+            continue;
+        }
 
-break;
-}
+        break;
+    }
     freeaddrinfo(clientinfo); // all done with this structure
     if (l == NULL)  {
         fprintf(stderr, "client: failed to bind\n");
@@ -299,25 +299,25 @@ break;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
     if ((rv = getaddrinfo(NULL, std::to_string(S->get_scout_listen_port(server_id)).c_str(),
-      &hints, &servinfo)) != 0) {
+                          &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-    return false;
-}
-    // loop through all the results and connect to the first we can
-for (l = servinfo; l != NULL; l = l->ai_next)
-{
-    errno = 0;
-    if (connect(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
-        close(sockfd);
-            // if (errno == EBADF) cout << errno << endl;
-        continue;
+        return false;
     }
+    // loop through all the results and connect to the first we can
+    for (l = servinfo; l != NULL; l = l->ai_next)
+    {
+        errno = 0;
+        if (connect(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
+            close(sockfd);
+            // if (errno == EBADF) cout << errno << endl;
+            continue;
+        }
 
-    break;
-}
-if (l == NULL) {
-    return false;
-}
+        break;
+    }
+    if (l == NULL) {
+        return false;
+    }
     // int outgoing_port = ntohs(return_port_no((struct sockaddr *)l->ai_addr));
     freeaddrinfo(servinfo); // all done with this structure
     set_scout_fd(server_id, sockfd);
@@ -329,7 +329,7 @@ if (l == NULL) {
  * @param server_id id of server whose replica to connect to
  * @return  true if connection was successfull or already connected
  */
- bool Replica::ConnectToReplica(const int server_id) {
+bool Replica::ConnectToReplica(const int server_id) {
     // if (get_commander_fd(server_id) != -1) return true;
 
     int sockfd;  // listen on sock_fd, new connection on new_fd
@@ -344,34 +344,34 @@ if (l == NULL) {
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
     if ((rv = getaddrinfo(NULL, std::to_string(S->get_replica_port(S->get_pid())).c_str(),
-      &hints, &clientinfo)) != 0) {
+                          &hints, &clientinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-    exit (1);
-}
+        exit (1);
+    }
 
     // loop through all the results and bind to the first we can
-for (l = clientinfo; l != NULL; l = l->ai_next)
-{
-    if ((sockfd = socket(l->ai_family, l->ai_socktype,
-       l->ai_protocol)) == -1) {
-        perror("client: socket ERROR");
-    continue;
-}
+    for (l = clientinfo; l != NULL; l = l->ai_next)
+    {
+        if ((sockfd = socket(l->ai_family, l->ai_socktype,
+                             l->ai_protocol)) == -1) {
+            perror("client: socket ERROR");
+            continue;
+        }
 
-if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
- sizeof(int)) == -1) {
-    perror("setsockopt ERROR");
-exit(1);
-}
+        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
+                       sizeof(int)) == -1) {
+            perror("setsockopt ERROR");
+            exit(1);
+        }
 
-if (bind(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
-    close(sockfd);
-    perror("client: bind ERROR");
-    continue;
-}
+        if (bind(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
+            close(sockfd);
+            perror("client: bind ERROR");
+            continue;
+        }
 
-break;
-}
+        break;
+    }
     freeaddrinfo(clientinfo); // all done with this structure
     if (l == NULL)  {
         fprintf(stderr, "client: failed to bind\n");
@@ -397,26 +397,25 @@ break;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
     if ((rv = getaddrinfo(NULL, std::to_string(S->get_replica_listen_port(server_id)).c_str(),
-      &hints, &servinfo)) != 0) {
+                          &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-    return false;
-}
-    // loop through all the results and connect to the first we can
-for (l = servinfo; l != NULL; l = l->ai_next)
-{
-    errno = 0;
-    if (connect(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
-        close(sockfd);
-            // if (errno == EBADF) cout << errno << endl;
-        continue;
+        return false;
     }
+    // loop through all the results and connect to the first we can
+    for (l = servinfo; l != NULL; l = l->ai_next)
+    {
+        errno = 0;
+        if (connect(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
+            close(sockfd);
+            // if (errno == EBADF) cout << errno << endl;
+            continue;
+        }
 
-    break;
-}
-if (l == NULL) {
-    cout<<S->get_pid()<<"replica-socket connect to replica failed"<<endl;
-    return false;
-}
+        break;
+    }
+    if (l == NULL) {
+        return false;
+    }
     // int outgoing_port = ntohs(return_port_no((struct sockaddr *)l->ai_addr));
     freeaddrinfo(servinfo); // all done with this structure
     set_replica_fd(server_id, sockfd);

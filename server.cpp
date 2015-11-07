@@ -120,7 +120,7 @@ string Server::get_all_clear(string role)
 bool Server::get_leader_ready() {
     bool b;
     pthread_mutex_lock(&leader_ready_lock);
-    b = get_leader_ready();
+    b = leader_ready_;
     pthread_mutex_unlock(&leader_ready_lock);
     return b;
 }
@@ -128,7 +128,7 @@ bool Server::get_leader_ready() {
 bool Server::get_replica_ready() {
     bool b;
     pthread_mutex_lock(&replica_ready_lock);
-    b = get_replica_ready();
+    b = replica_ready_;
     pthread_mutex_unlock(&replica_ready_lock);
     return b;
 }
@@ -136,7 +136,7 @@ bool Server::get_replica_ready() {
 bool Server::get_acceptor_ready() {
     bool b;
     pthread_mutex_lock(&acceptor_ready_lock);
-    b = get_acceptor_ready();
+    b = acceptor_ready_;
     pthread_mutex_unlock(&acceptor_ready_lock);
     return b;
 }
@@ -401,7 +401,6 @@ void Server::AllClearPhase()
     string message = kAllClearDone + kInternalDelim + kMessageDelim;
     if(get_master_fd()==-1)
     {
-        D(cout<<"Cant send all clear done to master as fd=-1"<<endl;)
         return;
     }
     if (send(get_master_fd(), message.c_str(), message.size(), 0) == -1) {
@@ -439,11 +438,9 @@ void Server::FinishAllClear()
 
     while (!get_leader_ready() || !get_replica_ready() || !get_acceptor_ready()) {
         usleep(kBusyWaitSleep);
-        cout<<get_pid()<<" sleeping"<<endl;
     }
 
     if(get_leader_ready() && get_acceptor_ready() && get_replica_ready())
-        cout<<endl<<endl<<"all ready"<<endl;
     set_leader_ready(false);
     set_acceptor_ready(false);
     set_replica_ready(false);

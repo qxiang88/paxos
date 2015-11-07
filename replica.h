@@ -39,6 +39,7 @@ public:
     void MergeDecisions(map<int, Proposal>);
     void DecisionsRecoveryMode();
     void ResetFD(const int fd, const int primary_id);
+    void ResendProposals(const int primary_id);
 
     int get_slot_num();
     int get_commander_fd(const int server_id);
