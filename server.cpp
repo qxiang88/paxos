@@ -369,10 +369,15 @@ void Server::AllClearPhase()
     }
 
     string message = kAllClearDone + kInternalDelim + kMessageDelim;
+    if(get_master_fd()==-1)
+    {
+        D(cout<<"Cant send all clear done to master as fd=-1"<<endl;)
+        return;
+    }
     if (send(get_master_fd(), message.c_str(), message.size(), 0) == -1) {
         D(cout << "S" << get_pid() << " : ERROR: Cannot send all clear done to master" <<  endl;)
     } else {
-        D(cout << "S" << get_pid() << " : All clear done message sent to master" << endl;)
+        D(cout << "S" << get_pid() << " : All clear done message sent to master" <<get_primary_id()<< endl;)
     }
     //wait for messages from leader and replica. once received. send to master
 }

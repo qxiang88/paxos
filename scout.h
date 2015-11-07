@@ -18,11 +18,13 @@ void* ScoutMode(void* _rcv_thread_arg);
 class Scout {
 public:
     void SendToServers(const string& type, const string& msg);
-    void GetAcceptorFdSet(fd_set& acceptor_set, int& fd_max);
+    void GetAcceptorFdSet(fd_set&, vector<int>&, int&);
     void SendP1a(const Ballot &b);
     void SendAdopted(const Ballot& recvd_ballot, unordered_set<Triple> pvalues);
     void SendPreEmpted(const Ballot& b);
     void Unicast(const string &type, const string& msg);
+    void CloseAndUnSetAcceptor(int id);
+    int GetServerIdFromFd(int fd);
     
     int get_leader_fd(const int server_id);
     int get_replica_fd(const int server_id);

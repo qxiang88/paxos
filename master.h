@@ -41,6 +41,9 @@ public:
     void InformClientsAboutNewPrimary();
     void InformServersAboutNewPrimary();
     void WaitForGoAhead();
+    void CloseAndUnSetServer(int id);
+    int GetServerIdFromFd(int fd);
+
 
     int get_server_fd(const int server_id);
     int get_client_fd(const int client_id);

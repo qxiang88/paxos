@@ -14,6 +14,7 @@
 #include "errno.h"
 #include "limits.h"
 #include "sys/socket.h"
+#include "pthread.h"
 using namespace std;
 
 #define DEBUG
@@ -190,6 +191,7 @@ void Master::set_server_status(const int server_id, const Status s) {
             int server_id;
             iss >> server_id;
             CrashServer(server_id);
+            D(cout<<"M : crashed server "<<server_id<<endl;)
             if (server_id == get_primary_id()) {
                 NewPrimaryElection();
                 WaitForGoAhead();
@@ -203,7 +205,7 @@ void Master::set_server_status(const int server_id, const Status s) {
             usleep(kGeneralSleep);
             usleep(kGeneralSleep);
             usleep(kGeneralSleep);
-            // D(cout<<endl<<endl<<"All Clear Message being sent"<<endl<<endl;)
+            D(cout<<endl<<endl<<"All Clear Message being sent"<<endl<<endl;)
             SendAllClearToServers(kAllClear); //sends to primary server
             WaitForAllClearDone();
             SendAllClearToServers(kAllClearRemove); //sends to primary server
@@ -258,7 +260,22 @@ void Master::WaitForGoAhead() {
         }
     }
 }
+int Master::GetServerIdFromFd(int fd)
+{
+    for(int i=0; i<get_num_servers(); i++)
+    {
+        if(get_server_fd(i)==fd)
+        {
+            return i;
+        }
+    }
+}
+void Master::CloseAndUnSetServer(int id)
+{
+    close(get_server_fd(id));
+    set_server_fd(id, -1);
 
+}
 void Master::WaitForAllClearDone()
 {
     fd_set server_set;
@@ -271,7 +288,6 @@ void Master::WaitForAllClearDone()
         if (get_server_status(i) != DEAD)
             waitfor++;
     }
-
     while (waitfor) {  // always listen to messages from the acceptors
         GetServerFdSet(server_set, fds, fd_max);
 
@@ -287,21 +303,21 @@ void Master::WaitForAllClearDone()
             D(cout << "M  : ERROR: Unexpected timeout in select() while waiting for all clear" << endl;)
         } else {
             for (int i = 0; i < fds.size(); i++) {
-                if(get_server_status(i) == DEAD)
+                if(get_server_status(GetServerIdFromFd(fds[i])) == DEAD)
                     continue;
+
 
                 if (FD_ISSET(fds[i], &server_set)) { // we got one!!
                     char buf[kMaxDataSize];
+                    int serv_id = GetServerIdFromFd(fds[i]);
                     if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1) {
-                        D(cout << "M: ERROR in receiving all clear domr from server S" << i << endl;)
-                        close(fds[i]);
-                        set_server_fd(i, -1);
+                        CloseAndUnSetServer(serv_id);
+                        D(cout << "M: ERROR in receiving all clear done from server S" << serv_id << endl;)
                         waitfor--;
                     } 
                     else if (num_bytes == 0) 
                     {     //connection closed
-                        close(fds[i]);
-                        set_server_fd(i, -1);
+                        CloseAndUnSetServer(serv_id);
                         waitfor--;
                         // D(cout << "M: ERROR Connection closed by server S" << i << endl;)
                     } 
@@ -314,7 +330,7 @@ void Master::WaitForAllClearDone()
                             std::vector<string> token = split(string(msg), kInternalDelim[0]);
                             if (token[0] == kAllClearDone)
                             {
-                                D(cout << "M  : S" << i << " is allClearDone" << endl;)
+                                D(cout << "M  : S" << serv_id << " is allClearDone" << endl;)
                                 waitfor--;
                             }
                         }
@@ -522,10 +538,10 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
         sprintf(num_clients_arg, "%d", num_clients_);
 
         //for testing
-        if(i==1)
-            sprintf(mode_arg, "%d", 2);
-        else
-            sprintf(mode_arg, "%d", 1);
+        // if(i==1)
+        //     sprintf(mode_arg, "%d", 2);
+        // else
+        sprintf(mode_arg, "%d", 1);
 
         char *argv[] = {(char*)kServerExecutable.c_str(),
             server_id_arg,
@@ -541,7 +557,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
            argv,
            environ);
         if (status == 0) {
-            // D(cout << "M  : Spawed server S" << i << endl;)
+            D(cout << "M  : Spawed server S" << i << endl;)
             set_server_pid(i, pid);
         } else {
             D(cout << "M  : ERROR: Cannot spawn server S"
@@ -554,7 +570,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
     usleep(kGeneralSleep);
     for (int i = 0; i < n; ++i) {
         if (ConnectToServer(i)) {
-            // D(cout << "M  : Connected to server S" << i << endl;)
+            D(cout << "M  : Connected to server S" << i << endl;)
         } else {
             D(cout << "M  : ERROR: Cannot connect to server S" << i << endl;)
             return false;
@@ -591,7 +607,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
             argv,
             environ);
         if (status == 0) {
-            // D(cout << "M  : Spawed client C" << i << endl;)
+            D(cout << "M  : Spawed client C" << i << endl;)
             set_client_pid(i, pid);
         } else {
             D(cout << "M  : ERROR: Cannot spawn client C" << i << " - " << strerror(status) << endl;)
@@ -603,7 +619,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
     usleep(kGeneralSleep);
     for (int i = 0; i < n; ++i) {
         if (ConnectToClient(i)) {
-            // D(cout << "M  : Connected to client C" << i << endl;)
+            D(cout << "M  : Connected to client C" << i << endl;)
         } else {
             D(cout << "M  : ERROR: Cannot connect to client C" << i << endl;)
             return false;
@@ -695,7 +711,9 @@ int main() {
     Master M;
     M.ReadTest();
 
-    usleep(18000 * 1000);
+    // while(1);
+    sleep(10);
+    cout<<"Master crashing all"<<endl;
     M.KillAllServers();
     M.KillAllClients();
     return 0;

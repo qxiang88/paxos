@@ -136,7 +136,7 @@ void Replica::Unicast(const string &type, const string& msg, const int primary_i
  * proposes the proposal to a leader
  * @param p Proposal to be proposed
  */
-void Replica::Propose(const Proposal &p, const int primary_id) {
+ void Replica::Propose(const Proposal &p, const int primary_id) {
     for (auto it = decisions_.begin(); it != decisions_.end(); ++it ) {
         if (it->second == p)
             return;
@@ -161,8 +161,8 @@ void Replica::Propose(const Proposal &p, const int primary_id) {
  * @param s proposed slot num for this proposal
  * @param p proposal to be proposed
  */
-void Replica::SendProposal(const int& s, const Proposal& p, const int primary_id)
-{
+ void Replica::SendProposal(const int& s, const Proposal& p, const int primary_id)
+ {
     string msg = kPropose + kInternalDelim;
     msg += to_string(s) + kInternalDelim;
     msg += proposalToString(p) + kMessageDelim;
@@ -175,8 +175,8 @@ void Replica::SendProposal(const int& s, const Proposal& p, const int primary_id
  * @param slot decided slot num
  * @param p    decided proposal
  */
-void Replica::Perform(const int& slot, const Proposal& p, const int primary_id)
-{
+ void Replica::Perform(const int& slot, const Proposal& p, const int primary_id)
+ {
     for (auto it = decisions_.begin(); it != decisions_.end(); it++)
     {
         if (it->second == p && it->first < get_slot_num())
@@ -195,10 +195,10 @@ void Replica::Perform(const int& slot, const Proposal& p, const int primary_id)
  * @param s decided slot num
  * @param p proposal to be sent
  */
-void Replica::SendResponseToAllClients(const int& s,
-                                       const Proposal& p,
-                                       const int primary_id)
-{
+ void Replica::SendResponseToAllClients(const int& s,
+     const Proposal& p,
+     const int primary_id)
+ {
     if (S->get_pid() != primary_id)
         return;
 
@@ -246,12 +246,12 @@ void Replica::CheckReceivedAllDecisions(map<int, Proposal>& allDecisions)
     }
     else
     {
-        // D(cout << "SR" << S->get_pid() << ": Has not received every decision" << endl;)
+        D(cout << "SR" << S->get_pid() << ": Has not received every decision" << endl;)
     }
 }
 
 void Replica::CreateFdSet(fd_set& fromset, vector<int> &fds,
-                          int& fd_max, const int primary_id)
+  int& fd_max, const int primary_id)
 {
     fd_max = INT_MIN;
     int fd_temp;
@@ -332,6 +332,9 @@ void Replica::ResetFD(const int fd, const int primary_id) {
 
 void Replica::CheckAndDecrementWaitFor(vector<int>& waitfor, const int& s_fd)
 {
+    if (S->get_mode() != RECOVER) {
+        return;
+    }
     for (int i = 0; i < S->get_num_servers(); ++i) {
         if (s_fd == get_replica_fd(i)) {
             for (int j = 0; j < waitfor.size(); j++)
@@ -339,7 +342,7 @@ void Replica::CheckAndDecrementWaitFor(vector<int>& waitfor, const int& s_fd)
                 if (waitfor[j] == i)
                 {
                     waitfor.erase(waitfor.begin() + j);
-                    // D(cout<<"decremented waitfor"<<endl;)
+                    D(cout<<"decremented waitfor"<<endl;)
                     return;
                 }
             }
@@ -352,8 +355,8 @@ void Replica::CheckAndDecrementWaitFor(vector<int>& waitfor, const int& s_fd)
  * function for performing replica related job
  */
 
-void Replica::ReplicaMode(const int primary_id)
-{
+ void Replica::ReplicaMode(const int primary_id)
+ {
     char buf[kMaxDataSize];
     int num_bytes;
 
@@ -426,7 +429,7 @@ void Replica::ReplicaMode(const int primary_id)
                                 }
                                 else
                                 {
-                                    // ProposeBuffered(primary_id);
+                                    ProposeBuffered(primary_id);
                                     Propose(p, primary_id);
                                 }
                             }
@@ -583,7 +586,8 @@ void Replica::MergeDecisions(map<int, Proposal> receivedAllDecisions)
  * @param  _S pointer to server class object
  * @return    NULL
  */
-void* ReplicaEntry(void *_S) {
+ void* ReplicaEntry(void *_S) {
+    signal(SIGPIPE, SIG_IGN);
     Replica R((Server*)_S);
 
     pthread_t accept_connections_thread;
@@ -594,8 +598,8 @@ void* ReplicaEntry(void *_S) {
     usleep(kGeneralSleep);
     int primary_id = R.S->get_primary_id();
     if (R.ConnectToCommander(primary_id)) {
-        // D(cout << "SR" << R.S->get_pid() << ": Connected to commander of S"
-        //   << primary_id << endl;)
+        D(cout << "SR" << R.S->get_pid() << ": Connected to commander of S"
+          << primary_id << endl;)
     } else {
         D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to commander of S"
           << primary_id << endl;)
@@ -603,8 +607,8 @@ void* ReplicaEntry(void *_S) {
     }
 
     if (R.ConnectToScout(primary_id)) {
-        // D(cout << "SR" << R.S->get_pid() << ": Connected to scout of S"
-        //   << primary_id << endl;)
+        D(cout << "SR" << R.S->get_pid() << ": Connected to scout of S"
+          << primary_id << endl;)
     } else {
         D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to scout of S"
           << primary_id << endl;)

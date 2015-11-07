@@ -166,17 +166,19 @@ void Commander::ConnectToAllAcceptors(std::vector<int> &acceptor_peer_fd) {
     }
 }
 
-void Commander::GetAcceptorFdSet(fd_set& acceptor_set, int& fd_max)
+void Commander::GetAcceptorFdSet(fd_set& acceptor_set, vector<int>& fds, int& fd_max)
 {
     fd_max = INT_MIN;
     int fd_temp;
     FD_ZERO(&acceptor_set);
+    fds.clear();
     for (int i = 0; i < S->get_num_servers(); i++) {
         fd_temp = get_acceptor_fd(i);
         if (fd_temp != -1)
         {
             FD_SET(fd_temp, &acceptor_set);
             fd_max = max(fd_max, fd_temp);
+            fds.push_back(fd_temp);
         }
     }
 }
@@ -194,7 +196,19 @@ void Commander::GetAcceptorFdSet(fd_set& acceptor_set, int& fd_max)
     }
 }
 
+int Commander::GetAcceptorIdFromFd(int fd)
+{
+    for(int i=0;i<S->get_num_servers();i++)
+    {
+        if(get_acceptor_fd(i)==fd)
+            return i;
+    }
+
+}
+
 void* CommanderMode(void* _rcv_thread_arg) {
+    signal(SIGPIPE, SIG_IGN);
+    
     CommanderThreadArgument *rcv_thread_arg = (CommanderThreadArgument *)_rcv_thread_arg;
     Commander *C = rcv_thread_arg->C;
     Triple toSend = rcv_thread_arg->toSend;
@@ -208,10 +222,10 @@ void* CommanderMode(void* _rcv_thread_arg) {
 
     fd_set acceptor_set;
     int fd_max = INT_MIN;
-
+    vector<int> fds;
     int waitfor = num_servers;
     while (true) {  // always listen to messages from the acceptors
-        C->GetAcceptorFdSet(acceptor_set, fd_max);
+        C->GetAcceptorFdSet(acceptor_set, fds, fd_max);
 
         if (fd_max == INT_MIN) {
             // it means fd_set is empty, i.e. no more interesting acceptors left
@@ -230,30 +244,32 @@ void* CommanderMode(void* _rcv_thread_arg) {
         } else if (rv == 0) {
             D(cout << "SC" << C->S->get_pid() << ": ERROR: Unexpected timeout in select()" << endl;)
         } else {
-            for (int i = 0; i < num_servers; i++) {
-                if (FD_ISSET(C->get_acceptor_fd(i), &acceptor_set)) { // we got one!!
+            for (int i = 0; i < fds.size(); i++) {
+                if (FD_ISSET(fds[i], &acceptor_set)) { // we got one!!
                     char buf[kMaxDataSize];
-                    if ((num_bytes = recv(C->get_acceptor_fd(i), buf, kMaxDataSize - 1, 0)) == -1) {
-                        D(cout << "SC" << C->S->get_pid() << ": ERROR in receiving p2b from acceptor S" << i << endl;)
-                        close(C->get_acceptor_fd(i));
-                        C->set_acceptor_fd(i, -1);
+                    int serv_id = C->GetAcceptorIdFromFd(fds[i]);
+                    if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1) {
+                        D(cout << "SC" << C->S->get_pid() << ": ERROR in receiving p2b from acceptor S" << serv_id << endl;)
+                        close(fds[i]);
+                        C->set_acceptor_fd(serv_id, -1);
                     } else if (num_bytes == 0) {     //connection closed
-                        D(cout << "SC" << C->S->get_pid() << ": Connection closed by acceptor S" << i << endl;)
-                        close(C->get_acceptor_fd(i));
-                        C->set_acceptor_fd(i, -1);
+                        D(cout << "SC" << C->S->get_pid() << ": Connection closed by acceptor S" << serv_id << endl;)
+                        close(fds[i]);
+                        C->set_acceptor_fd(serv_id, -1);
                     } else {
                         buf[num_bytes] = '\0';
                         std::vector<string> message = split(string(buf), kMessageDelim[0]);
                         for (const auto &msg : message) {
                             std::vector<string> token = split(string(msg), kInternalDelim[0]);
+
                             if (token[0] == kP2b) {
                                 D(cout << "SC" << C->S->get_pid()
-                                  << ": P2b message received from acceptor S" << i << ": " << msg <<  endl;)
+                                    << ": P2b message received from acceptor S" << serv_id << ": " << msg <<  endl;)
 
                                 // close connection with this acceptor
                                 // because no future communication with it will happen
-                                close(C->get_acceptor_fd(i));
-                                C->set_acceptor_fd(i, -1);
+                                close(fds[i]);
+                                C->set_acceptor_fd(serv_id, -1);
 
                                 Ballot recvd_ballot = stringToBallot(token[2]);
                                 if (recvd_ballot == toSend.b)

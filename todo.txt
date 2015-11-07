@@ -1,7 +1,8 @@
-remove get_replica_port ?
-
-void Master::WaitForAllClearDone()
-set_server_fd(i,-1) replace i with actual server id
-
-
 Set mode for server when recovering
+
+done - pause acceptor of recovered process till mode is runninge 
+ready thing for recovering process
+
+
+remove get_replica_port ?
+check if commander select causes issues when closed fd is tested on isset

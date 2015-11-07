@@ -59,7 +59,7 @@ void Acceptor::set_best_ballot_num(const Ballot &b) {
  * adds the fd for communication with a commander to commander_fd_set_
  * @param fd fd to be added
  */
-void Acceptor::AddToCommanderFDSet(const int fd) {
+ void Acceptor::AddToCommanderFDSet(const int fd) {
     commander_fd_set_.insert(fd);
 }
 
@@ -67,7 +67,7 @@ void Acceptor::AddToCommanderFDSet(const int fd) {
  * removes the fd for communication with a commander from commander_fd_set_
  * @param fd fd to be removed
  */
-void Acceptor::RemoveFromCommanderFDSet(const int fd) {
+ void Acceptor::RemoveFromCommanderFDSet(const int fd) {
     commander_fd_set_.erase(fd);
 }
 
@@ -77,8 +77,8 @@ void Acceptor::RemoveFromCommanderFDSet(const int fd) {
  * @param cfds_vec [out] vector correponding to the constructed fd_set
  * @param fd_max   [out] maximum value of fd in the constructed fd_set
  */
-void Acceptor::GetCommanderFdSet(fd_set& cfds_set, int& fd_max, std::vector<int> &cfds_vec)
-{
+ void Acceptor::GetCommanderFdSet(fd_set& cfds_set, int& fd_max, std::vector<int> &cfds_vec)
+ {
     int fd_temp;
     cfds_vec.clear();
     fd_max = INT_MIN;
@@ -101,8 +101,13 @@ void Acceptor::GetCommanderFdSet(fd_set& cfds_set, int& fd_max, std::vector<int>
  * back to the commander
  * @param fd acceptor side's fd for commander-acceptor connection
  */
-void Acceptor::SendBackOwnFD(const int fd) {
+ void Acceptor::SendBackOwnFD(const int fd) {
     string msg = to_string(fd);
+    if(fd==-1)
+    {
+        cout<<"Send failed as fd=-1 in SendBackOwnFD"<<endl;
+        return;
+    }
     if (send(fd, msg.c_str(), msg.size(), 0) == -1) {
         D(cout << "SA" << S->get_pid() << ": ERROR: Cannot send fd to commander" << endl;)
         close(fd);
@@ -113,7 +118,7 @@ void Acceptor::SendBackOwnFD(const int fd) {
 }
 
 void Acceptor::Unicast(const string &type, const string& msg,
-                       const int primary_id, int r_fd)
+ const int primary_id, int r_fd)
 {
     int serv_fd;
     if (r_fd == -1)
@@ -121,6 +126,11 @@ void Acceptor::Unicast(const string &type, const string& msg,
     else
         serv_fd = r_fd;
 
+    if(serv_fd==-1)
+    {
+        cout<<"Send failed as fd=-1 in acceptor unicast"<<endl;
+        return;
+    }
     if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
         D(cout << "SA" << S->get_pid() << ": ERROR in sending " << type << endl;)
         if (serv_fd == get_scout_fd(primary_id)) {
@@ -141,9 +151,9 @@ void Acceptor::Unicast(const string &type, const string& msg,
  * @param b  current best ballot num of acceptor
  * @param st accepted set of acceptor
  */
-void Acceptor::SendP1b(const Ballot& b, const unordered_set<Triple> &st,
-                       const int primary_id)
-{
+ void Acceptor::SendP1b(const Ballot& b, const unordered_set<Triple> &st,
+     const int primary_id)
+ {
     string msg = kP1b + kInternalDelim + to_string(S->get_pid());
     msg += kInternalDelim + ballotToString(b) + kInternalDelim;
     msg += tripleSetToString(st) + kMessageDelim;
@@ -155,8 +165,8 @@ void Acceptor::SendP1b(const Ballot& b, const unordered_set<Triple> &st,
  * @param b         current best ballot num of acceptor
  * @param return_fd acceptor side fd for the commander-acceptor connection
  */
-void Acceptor::SendP2b(const Ballot& b, int return_fd, const int primary_id)
-{
+ void Acceptor::SendP2b(const Ballot& b, int return_fd, const int primary_id)
+ {
     string msg = kP2b + kInternalDelim + to_string(S->get_pid());
     msg += kInternalDelim + ballotToString(b) + kMessageDelim;
     Unicast(kP2b, msg, primary_id, return_fd);
@@ -165,12 +175,18 @@ void Acceptor::SendP2b(const Ballot& b, int return_fd, const int primary_id)
 /**
  * function for performing acceptor related job
  */
-void Acceptor::AcceptorMode(const int primary_id)
-{
+ void Acceptor::AcceptorMode(const int primary_id)
+ {
     int num_bytes;
     vector<int> fds;
     fd_set recv_from;
 
+    while(S->get_mode()==RECOVER)
+    {
+        usleep(kBusyWaitSleep);
+    }
+
+    
     while (true) {  // always listen to messages from the acceptors
         if (primary_id != S->get_primary_id()) {   // new primary has been elected
             close(get_scout_fd(primary_id));
@@ -208,7 +224,6 @@ void Acceptor::AcceptorMode(const int primary_id)
                     if ((num_bytes = recv(fds[i], buf, kMaxDataSize - 1, 0)) == -1) {
                         D(cout << "SA" << S->get_pid() << ": ERROR in receiving from scout or commander" << endl;)
                         if (fds[i] == get_scout_fd(primary_id)) {
-                            cout << "Scout" << endl;
                             close(fds[i]);
                             set_scout_fd(primary_id, -1);
                         } else {
@@ -232,7 +247,7 @@ void Acceptor::AcceptorMode(const int primary_id)
                             std::vector<string> token = split(string(msg), kInternalDelim[0]);
                             if (token[0] == kP1a)
                             {
-                                D(cout << "SA" << S->get_pid() << ": Received P1A message" <<  endl;)
+                                D(cout << "SA" << S->get_pid() << ": Received P1A message" <<msg<<  endl;)
                                 Ballot recvd_ballot = stringToBallot(token[2]);
                                 if (recvd_ballot > get_best_ballot_num())
                                     set_best_ballot_num(recvd_ballot);
@@ -240,7 +255,7 @@ void Acceptor::AcceptorMode(const int primary_id)
                             }
                             else if (token[0] == kP2a)
                             {
-                                D(cout << "SA" << S->get_pid() << ": Received P2A message" <<  endl;)
+                                D(cout << "SA" << S->get_pid() << ": Received P2A message: " << msg<< endl;)
 
                                 int return_fd = stoi(token[1]);
                                 Triple recvd_triple = stringToTriple(token[2]);
@@ -270,7 +285,8 @@ void Acceptor::AcceptorMode(const int primary_id)
  * @param  _S pointer to server class object
  * @return    NULL
  */
-void* AcceptorEntry(void *_S) {
+ void* AcceptorEntry(void *_S) {
+    signal(SIGPIPE, SIG_IGN);
     Acceptor A((Server*)_S);
 
     pthread_t accept_connections_thread;

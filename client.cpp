@@ -243,7 +243,7 @@ int Client::set_primary_id(const int primary_id) {
     set_primary_id(new_primary);
     
     if (ConnectToPrimary()) {
-        D(cout << "C" << get_pid() << " : Connected to primary S" << get_primary_id() << endl;)
+        // D(cout << "C" << get_pid() << " : Connected to primary S" << get_primary_id() << endl;)
     } else {
         D(cout << "C" << get_pid() << " : ERROR in connecting to primary S" << get_primary_id() << endl;)
     }
@@ -328,7 +328,7 @@ int Client::set_primary_id(const int primary_id) {
         num_bytes = recv(primary_fd, buf, kMaxDataSize - 1, 0);
         if (num_bytes == -1) {
             // D(cout << "C" << C->get_pid() <<
-            // " : ERROR in receiving message from primary S" << primary_id << endl;)
+                // " : ERROR in receiving message from primary S" << primary_id << endl;)
             usleep(kBusyWaitSleep);
         } else if (num_bytes == 0) {    // connection closed by primary
             D(cout << "C" << C->get_pid() << " : Connection closed by primary S" << primary_id << endl;)

@@ -135,9 +135,9 @@ string ballotToString(const Ballot& b)
 
 string tripleSetToString(const unordered_set<Triple>& st)
 {
- string rval;
- for (auto it=st.begin(); it!=st.end(); it++)
- {
+   string rval;
+   for (auto it=st.begin(); it!=st.end(); it++)
+   {
     if(it!=st.begin())
         rval += kInternalSetDelim;
     rval += tripleToString(*it);
@@ -251,6 +251,7 @@ Ballot stringToBallot(const string& s)
 {
     Ballot b;
     vector<string> parts = split(s, kInternalStructDelim[0]);
+    // cout<<"string to ballot:"<<s<<parts.size()<<endl;
     b.id = stoi(parts[0]);
     b.seq_num = stoi(parts[1]);
     return b;

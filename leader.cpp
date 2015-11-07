@@ -145,7 +145,9 @@ void Leader::SendReplicasAllDecisions()
  * @param  _S pointer to server class object
  * @return    NULL
  */
-void* LeaderEntry(void *_S) {
+ void* LeaderEntry(void *_S) {
+    signal(SIGPIPE, SIG_IGN);
+    
     Leader L((Server*)_S);
 
     // does not need accept threads since it does not listen to connections from anyone
