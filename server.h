@@ -23,9 +23,9 @@ typedef enum {
 class Server {
 public:
     void Initialize(const int pid,
-                    const int num_servers,
-                    const int num_clients,
-                    int mode);
+        const int num_servers,
+        const int num_clients,
+        int mode);
     int IsReplicaPort(const int port);
     int IsAcceptorPort(const int port);
     int IsLeaderPort(const int port);
@@ -36,7 +36,7 @@ public:
     void AllClearPhase();
     void FinishAllClear();
     void HandleNewPrimary(const int new_primary_id);
-    void SendGoAheadToPrimary();
+    void SendGoAheadToMaster();
 
     bool get_leader_ready();
     bool get_replica_ready();

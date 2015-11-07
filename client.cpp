@@ -243,11 +243,10 @@ int Client::set_primary_id(const int primary_id) {
     set_primary_id(new_primary);
     
     if (ConnectToPrimary()) {
-        // D(cout << "C" << get_pid() << " : Connected to primary S" << get_primary_id() << endl;)
+        D(cout << "C" << get_pid() << " : Connected to primary S" << get_primary_id() << endl;)
     } else {
         D(cout << "C" << get_pid() << " : ERROR in connecting to primary S" << get_primary_id() << endl;)
     }
-
     ResendChats();
 }
 

@@ -176,12 +176,13 @@ void Leader::SendReplicasAllDecisions()
 
     for (int i = 0; i < L.S->get_num_servers(); i++)
     {
+
         if (L.ConnectToReplica(i)) {
             D(cout << "SL" << L.S->get_pid() << ": Connected to replica of S"
               << i << endl;)
         } else {
-            D(cout << "SL" << L.S->get_pid() << ": ERROR in connecting to replica of S"
-              << i << endl;)
+            // D(cout << "SL" << L.S->get_pid() << ": ERROR in connecting to replica of S"
+              // << i << endl;)
         }
     }
 
@@ -281,11 +282,12 @@ void Leader::SendReplicasAllDecisions()
                                     pvalues = stringToTripleSet(token[2]);
                                     proposals_ = pairxor(proposals_, pmax(pvalues));
                                 }
-
+                                cout<<"1"<<endl;
                                 pthread_t commander_thread[proposals_.size()];
                                 int i = 0;
                                 for (auto it = proposals_.begin(); it != proposals_.end(); it++)
                                 {
+                                    cout<<"2"<<endl;    
                                     // commander
                                     Commander *C = new Commander(S);
                                     CommanderThreadArgument* arg = new CommanderThreadArgument;
@@ -294,11 +296,12 @@ void Leader::SendReplicasAllDecisions()
                                     arg->toSend = tempt;
                                     CreateThread(CommanderMode, (void*)arg, commander_thread[i]);
                                     commanders_.push_back(commander_thread[i]);
+                                    cout<<"created a commander"<<endl;    
                                     i++;
+                                    set_leader_active(true);
+                                    cout<<"set leader active true"<<endl;    
                                 }
-                                set_leader_active(true);
                             }
-
                             else if (token[0] == kPreEmpted)
                             {
                                 D(cout << "SL" << S->get_pid() << ": PreEmpted message received: " << msg <<  endl;)

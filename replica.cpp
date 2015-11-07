@@ -196,8 +196,8 @@ void Replica::Unicast(const string &type, const string& msg, const int primary_i
  * @param p proposal to be sent
  */
  void Replica::SendResponseToAllClients(const int& s,
-     const Proposal& p,
-     const int primary_id)
+   const Proposal& p,
+   const int primary_id)
  {
     if (S->get_pid() != primary_id)
         return;
@@ -368,18 +368,20 @@ void Replica::CheckAndDecrementWaitFor(vector<int>& waitfor, const int& s_fd)
     if (S->get_mode() == RECOVER) {
         waitfor = SendDecisionsRequest();
     }
-
     map<int, Proposal> allDecs;
     allDecs[-1] = Proposal("", "", "");
+
+    S->set_replica_ready(false);
     while (true) {  // always listen to messages from the acceptors
 
         if (primary_id != S->get_primary_id()) {   // new primary elected
+            cout<<endl<<"replica ready:"<<S->get_replica_ready()<<endl;
+            cout<<S->get_pid()<<"replicamode new primary detected"<<endl;
             set_commander_fd(primary_id, -1);
             set_scout_fd(primary_id, -1);
             set_leader_fd(primary_id, -1);
             return;
         }
-
         CreateFdSet(fromset, fds, fd_max, primary_id);
 
         if (fd_max == INT_MIN) {
@@ -593,54 +595,58 @@ void Replica::MergeDecisions(map<int, Proposal> receivedAllDecisions)
     pthread_t accept_connections_thread;
     CreateThread(AcceptConnectionsReplica, (void*)&R, accept_connections_thread);
 
-    // sleep for some time to make sure accept threads of commanders and scouts are running
-    usleep(kGeneralSleep);
-    usleep(kGeneralSleep);
-    int primary_id = R.S->get_primary_id();
-    if (R.ConnectToCommander(primary_id)) {
-        D(cout << "SR" << R.S->get_pid() << ": Connected to commander of S"
-          << primary_id << endl;)
-    } else {
-        D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to commander of S"
-          << primary_id << endl;)
-        return NULL;
-    }
-
-    if (R.ConnectToScout(primary_id)) {
-        D(cout << "SR" << R.S->get_pid() << ": Connected to scout of S"
-          << primary_id << endl;)
-    } else {
-        D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to scout of S"
-          << primary_id << endl;)
-        return NULL;
-    }
-
-
-    for (int i = 0; i < R.S->get_pid(); i++)
+    while(1)
     {
-        if (R.ConnectToReplica(i)) {
-            D(cout << "SR" << R.S->get_pid() << ": Connected to replica of S"
-              << i << endl;)
+
+        // sleep for some time to make sure accept threads of commanders and scouts are running
+        usleep(kGeneralSleep);
+        usleep(kGeneralSleep);
+        int primary_id = R.S->get_primary_id();
+        if (R.ConnectToCommander(primary_id)) {
+            D(cout << "SR" << R.S->get_pid() << ": Connected to commander of S"
+              << primary_id << endl;)
         } else {
-            D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to replica of S"
-              << i << endl;)
+            D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to commander of S"
+              << primary_id << endl;)
             return NULL;
         }
+
+        if (R.ConnectToScout(primary_id)) {
+            D(cout << "SR" << R.S->get_pid() << ": Connected to scout of S"
+              << primary_id << endl;)
+        } else {
+            D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to scout of S"
+              << primary_id << endl;)
+            return NULL;
+        }
+
+
+        for (int i = 0; i < R.S->get_pid(); i++)
+            {   if(R.get_replica_fd(i)!=-1) //if not already connected
+                continue;
+                if (R.ConnectToReplica(i)) {
+                    D(cout << "SR" << R.S->get_pid() << ": Connected to replica of S"
+                      << i << endl;)
+                } else {
+                    D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to replica of S"
+                      << i << endl;)
+                    //return NULL; removed because replica may not be there sometimes
+                }
+            }
+        // sleep for some time to make sure all connections are established
+            usleep(kGeneralSleep);
+            usleep(kGeneralSleep);
+            usleep(kGeneralSleep);
+
+        // pthread_t receive_from_replicas_thread;
+        // CreateThread(ReceiveMessagesFromReplicas, (void*)&R, receive_from_replicas_thread);
+        // while(R.S->get_mode() != RUNNING)
+        //     usleep(kRecoveryWaitSleep);
+
+            R.S->set_replica_ready(true);
+            R.ReplicaMode(primary_id);
+        }
+        void *status;
+        pthread_join(accept_connections_thread, &status);
+        return NULL;
     }
-// sleep for some time to make sure all connections are established
-    usleep(kGeneralSleep);
-    usleep(kGeneralSleep);
-    usleep(kGeneralSleep);
-
-    // pthread_t receive_from_replicas_thread;
-    // CreateThread(ReceiveMessagesFromReplicas, (void*)&R, receive_from_replicas_thread);
-    // while(R.S->get_mode() != RUNNING)
-    //     usleep(kRecoveryWaitSleep);
-
-    R.S->set_replica_ready(true);
-    R.ReplicaMode(primary_id);
-
-    void *status;
-    pthread_join(accept_connections_thread, &status);
-    return NULL;
-}

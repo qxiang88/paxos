@@ -15,6 +15,10 @@ using namespace std;
 
 typedef pair<int, Proposal> SPtuple;
 pthread_mutex_t mode_lock;
+pthread_mutex_t replica_ready_lock;
+pthread_mutex_t leader_ready_lock;
+pthread_mutex_t acceptor_ready_lock;
+pthread_mutex_t all_clear_lock;
 
 #define DEBUG
 
@@ -32,7 +36,6 @@ extern void *ReplicaEntry(void *_S);
 extern void *AcceptorEntry(void *_S);
 extern void *LeaderEntry(void *_S);
 
-pthread_mutex_t all_clear_lock;
 
 int Server::get_pid() {
     return pid_;
@@ -115,15 +118,27 @@ string Server::get_all_clear(string role)
 }
 
 bool Server::get_leader_ready() {
-    return leader_ready_;
+    bool b;
+    pthread_mutex_lock(&leader_ready_lock);
+    b = get_leader_ready();
+    pthread_mutex_unlock(&leader_ready_lock);
+    return b;
 }
 
 bool Server::get_replica_ready() {
-    return replica_ready_;
+    bool b;
+    pthread_mutex_lock(&replica_ready_lock);
+    b = get_replica_ready();
+    pthread_mutex_unlock(&replica_ready_lock);
+    return b;
 }
 
 bool Server::get_acceptor_ready() {
-    return acceptor_ready_;
+    bool b;
+    pthread_mutex_lock(&acceptor_ready_lock);
+    b = get_acceptor_ready();
+    pthread_mutex_unlock(&acceptor_ready_lock);
+    return b;
 }
 
 int Server::get_num_clients() {
@@ -173,15 +188,21 @@ void Server::set_all_clear(string role, string status)
 }
 
 void Server::set_leader_ready(bool b) {
-    leader_ready_ = true;
+    pthread_mutex_lock(&leader_ready_lock);
+    leader_ready_ = b;
+    pthread_mutex_unlock(&leader_ready_lock);
 }
 
 void Server::set_replica_ready(bool b) {
-    replica_ready_ = true;
+    pthread_mutex_lock(&replica_ready_lock);
+    replica_ready_ = b;
+    pthread_mutex_unlock(&replica_ready_lock);
 }
 
 void Server::set_acceptor_ready(bool b) {
-    acceptor_ready_ = true;
+    pthread_mutex_lock(&acceptor_ready_lock);
+    acceptor_ready_ = b;
+    pthread_mutex_unlock(&acceptor_ready_lock);
 }
 
 /**
@@ -327,6 +348,15 @@ void Server::set_acceptor_ready(bool b) {
 
     if (pthread_mutex_init(&all_clear_lock, NULL) != 0) {
         D(cout << "S" << get_pid() << " : Mutex init failed" << endl;)
+    }  
+    if (pthread_mutex_init(&replica_ready_lock, NULL)!=0){
+        D(cout << "S" << get_pid() << " : Mutex init failed" << endl;)
+    }
+    if (pthread_mutex_init(&leader_ready_lock, NULL)!=0){
+        D(cout << "S" << get_pid() << " : Mutex init failed" << endl;)
+    }
+    if (pthread_mutex_init(&acceptor_ready_lock, NULL)!=0){
+        D(cout << "S" << get_pid() << " : Mutex init failed" << endl;)
     }
 
     set_all_clear(kLeaderRole, kAllClearNotSet);
@@ -377,7 +407,7 @@ void Server::AllClearPhase()
     if (send(get_master_fd(), message.c_str(), message.size(), 0) == -1) {
         D(cout << "S" << get_pid() << " : ERROR: Cannot send all clear done to master" <<  endl;)
     } else {
-        D(cout << "S" << get_pid() << " : All clear done message sent to master" <<get_primary_id()<< endl;)
+        D(cout << "S" << get_pid() << " : All clear done message sent to master" << endl;)
     }
     //wait for messages from leader and replica. once received. send to master
 }
@@ -409,15 +439,18 @@ void Server::FinishAllClear()
 
     while (!get_leader_ready() || !get_replica_ready() || !get_acceptor_ready()) {
         usleep(kBusyWaitSleep);
+        cout<<get_pid()<<" sleeping"<<endl;
     }
 
+    if(get_leader_ready() && get_acceptor_ready() && get_replica_ready())
+        cout<<endl<<endl<<"all ready"<<endl;
     set_leader_ready(false);
     set_acceptor_ready(false);
     set_replica_ready(false);
-    SendGoAheadToPrimary();
+    SendGoAheadToMaster();
 }
 
-void Server::SendGoAheadToPrimary() {
+void Server::SendGoAheadToMaster() {
     string message = kGoAhead + kInternalDelim + kMessageDelim;
     if (send(get_master_fd(), message.c_str(), message.size(), 0) == -1) {
         D(cout << "S" << get_pid() << " : ERROR: Cannot send GOAHEAD done to master" <<  endl;)

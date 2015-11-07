@@ -99,9 +99,7 @@ void Scout::GetAcceptorFdSet(fd_set& acceptor_set, vector<int>& fds, int& fd_max
 
 void Scout::Unicast(const string &type, const string& msg)
 {
-    cout<<S->get_pid();
     int serv_id = get_leader_fd(S->get_pid());
-    cout<<" "<<serv_id<<endl;
     if (send(get_leader_fd(S->get_pid()), msg.c_str(), msg.size(), 0) == -1) {
         D(cout << "SS" << S->get_pid() << ": ERROR in sending " << type << endl;)
     }
@@ -156,7 +154,6 @@ void* ScoutMode(void* _rcv_thread_arg) {
 
     int num_bytes;
     unordered_set<Triple> pvalues;
-    // fd_set temp_set;
 
     int num_servers = SC->S->get_num_servers();
     int waitfor = num_servers;
@@ -165,12 +162,10 @@ void* ScoutMode(void* _rcv_thread_arg) {
         fd_set acceptor_set;
         int fd_max;
         SC->GetAcceptorFdSet(acceptor_set, fds, fd_max);
-
         if (fd_max == INT_MIN) {
             usleep(kBusyWaitSleep);
             continue;
         }
-
         struct timeval timeout = kSelectTimeoutTimeval;
         int rv = select(fd_max + 1, &acceptor_set, NULL, NULL, &timeout);
         if (rv == -1) { //error in select
@@ -201,17 +196,21 @@ void* ScoutMode(void* _rcv_thread_arg) {
 
                                 Ballot recvd_ballot = stringToBallot(token[2]);
                                 unordered_set<Triple> r;
-
                                 if (token.size() == 4)
+                                {
                                     r = stringToTripleSet(token[3]);
-                                
+                                }
+
                                 if (recvd_ballot == ball)
                                 {
+
                                     union_set(pvalues, r);
                                     waitfor--;
                                     if ((float)waitfor < (num_servers / 2.0))
                                     {
+
                                         SC->SendAdopted(recvd_ballot, pvalues);
+                                        D(cout<<"Exit scout"<<endl;)
                                         return NULL;
                                     }
                                 } else {
@@ -221,6 +220,7 @@ void* ScoutMode(void* _rcv_thread_arg) {
                             } else {    //other messages
                                 D(cout << "SS" << SC->S->get_pid() << ": ERROR Unexpected message received: " << msg << endl;)
                             }
+
 
                         }
                     }

@@ -106,11 +106,14 @@ void union_set(unordered_set<Triple>& s1, unordered_set<Triple>&s2)
 {
     unordered_set <Triple> un; 
     unordered_set<Triple>::iterator got;
-    for(auto it=s2.begin(); it!=s2.end(); it++)
+    if(s2.size())
     {
-        got = s1.find(*it);
-        if(got==s1.end())
-            s1.insert(*it);
+        for(auto it=s2.begin(); it!=s2.end(); it++)
+        {
+            got = s1.find(*it);
+            if(got==s1.end())
+                s1.insert(*it);
+        }
     }
 }
 
@@ -135,9 +138,9 @@ string ballotToString(const Ballot& b)
 
 string tripleSetToString(const unordered_set<Triple>& st)
 {
-   string rval;
-   for (auto it=st.begin(); it!=st.end(); it++)
-   {
+ string rval;
+ for (auto it=st.begin(); it!=st.end(); it++)
+ {
     if(it!=st.begin())
         rval += kInternalSetDelim;
     rval += tripleToString(*it);
