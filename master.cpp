@@ -561,6 +561,8 @@ bool Master::RestartServer(const int server_id) {
         D(cout << "M  : ERROR: Cannot connect to server S" << server_id << endl;)
         return false;
     }
+
+    set_server_status(server_id, RECOVER);
     return true;
 }
 

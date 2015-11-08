@@ -36,6 +36,7 @@ const string kNewPrimary = "NEWPRIMARY";
 const string kTimeBomb = "TIMEBOMB";
 const string kKillMe = "KILLME";
 const string kGoAhead = "GOAHEAD";
+const string kNoop = "NOOP";
 
 const string kP1a = "P1A";
 const string kP2a = "P2A";
@@ -61,6 +62,7 @@ const time_t kGeneralSleep = 1000 * 1000;
 const time_t kBusyWaitSleep = 500 * 1000;
 const time_t kRecoveryWaitSleep = 100 * 1000;
 const time_t kAllClearSleep = 500 * 1000;
+const time_t kMinoritySleep = 2 * kGeneralSleep;
 
 // timeout values
 const timeval kReceiveTimeoutTimeval = {

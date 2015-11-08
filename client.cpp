@@ -353,7 +353,8 @@ void* ReceiveMessagesFromPrimary(void* _C) {
                     // proposal_token[1] = (chat id) wrt to original sender of chat message
                     // proposal_token[2] = (msg) chat message body
                     C->AddToFinalChatLog(token[1], proposal_token[1], proposal_token[2]);
-                    C->AddToDecidedChatIDs(stoi(token[1]));
+                    if (stoi(proposal_token[0]) == C->get_pid())
+                        C->AddToDecidedChatIDs(stoi(proposal_token[1]));
                 } else {
                     D(cout << "C" << C->get_pid() << " : Unexpected message received: " << msg << endl;)
 

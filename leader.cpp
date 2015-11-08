@@ -326,7 +326,7 @@ void Leader::LeaderMode()
                                     ScoutThreadArgument* arg = new ScoutThreadArgument;
                                     arg->SC = S->get_scout_object();
                                     arg->ball = get_ballot_num();
-                                    arg->sleep_time = 2 * kGeneralSleep;
+                                    arg->sleep_time = kMinoritySleep;
                                     CreateThread(ScoutMode, (void*)arg, scout_thread);
                                 }
                             }

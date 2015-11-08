@@ -177,6 +177,11 @@ void Replica::SendProposal(const int& s, const Proposal& p, const int primary_id
  */
 void Replica::Perform(const int& slot, const Proposal& p, const int primary_id)
 {
+    if (p.msg == kNoop) {
+        IncrementSlotNum();
+        return;
+    }
+
     for (auto it = decisions_.begin(); it != decisions_.end(); it++)
     {
         if (it->second == p && it->first < get_slot_num())
@@ -382,7 +387,6 @@ void Replica::ReplicaMode(const int primary_id)
 
         if (fd_max == INT_MIN) {
             usleep(kBusyWaitSleep);
-            D(cout << "SR" << S->get_pid() << ": ERROR Unexpected fd_set empty" << endl;)
             continue;
         }
 
@@ -446,7 +450,18 @@ void Replica::ReplicaMode(const int primary_id)
                                     if (proposals_.find(slot_num) != proposals_.end())
                                     {
                                         if (!(proposals_[slot_num] == currdecision))
-                                            Propose(proposals_[slot_num], primary_id);
+                                        {
+                                            if (S->get_all_clear(kReplicaRole) != kAllClearNotSet)
+                                            {
+                                                D(cout << "SR" << S->get_pid() << ": Buffering propose - " << token[1] << endl;)
+                                                buffered_proposals_.push_back(proposals_[slot_num]);
+                                            }
+                                            else
+                                            {
+                                                ProposeBuffered(primary_id);
+                                                Propose(proposals_[slot_num], primary_id);
+                                            }
+                                        }
                                     }
                                     Perform(slot_num, currdecision, primary_id);
                                     slot_num = get_slot_num();
@@ -484,14 +499,12 @@ void Replica::ReplicaMode(const int primary_id)
                                     else
                                         allDecs.clear(); //alldecs should be empty as leader sent empty as all decs
                                 }
-
-
                             }
                             else if (token[0] == kReqAllDecs)
                             {
                                 D(cout << "SR" << S->get_pid() << ": Request for all decisions message received: " << msg <<  endl;)
                                 SendDecisionsResponse(fds[i], primary_id);
-                                ResendProposals(primary_id);
+                                //ResendProposals(primary_id);
                             }
                             else {    //other messages
                                 D(cout << "SR" << S->get_pid() << ": ERROR Unexpected message received: " << msg << endl;)
@@ -505,6 +518,7 @@ void Replica::ReplicaMode(const int primary_id)
 }
 
 void Replica::ResendProposals(const int primary_id) {
+    //
     if (S->get_pid() != primary_id)
         return;
 
@@ -630,14 +644,14 @@ void* ReplicaEntry(void *_S) {
         }
 
         int upper_bound;
-        if(R.S->get_mode() == RECOVER)
+        if (R.S->get_mode() == RECOVER)
             upper_bound = R.S->get_num_servers();
         else
             upper_bound = R.S->get_pid();
 
         for (int i = 0; i < upper_bound; i++)
-        {   
-            if(R.S->get_pid() == i)
+        {
+            if (R.S->get_pid() == i)
                 continue;
             if (R.get_replica_fd(i) != -1) //if not already connected
                 continue;

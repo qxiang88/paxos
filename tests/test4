@@ -1,0 +1,11 @@
+start 3 3
+crashServer 0
+crashServer 2
+sendMessage 1 msg_from_first
+allClear
+restartServer 0
+sendMessage 2 msg_from_fifth
+allClear
+printChatLog 0
+printChatLog 1
+printChatLog 2

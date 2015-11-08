@@ -228,12 +228,13 @@ void* CommanderMode(void* _rcv_thread_arg) {
         C->GetAcceptorFdSet(acceptor_set, fds, fd_max);
 
         if (fd_max == INT_MIN) {
-            // it means fd_set is empty, i.e. no more interesting acceptors left
-            // commander can safely exit.
-            // TODO: what will happen to the leader waiting for this commander?
-            // TODO: verify if logic is correct
             D(cout << "SC" << C->S->get_pid()
               << ": Exiting because no more interesting acceptors left" << endl;)
+
+            usleep(kMinoritySleep);
+
+            Triple no_op(toSend.b, toSend.s, Proposal(to_string(0),to_string(0),kNoop));
+            C->SendDecision(no_op);
             return NULL;
         }
 

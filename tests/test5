@@ -1,0 +1,14 @@
+start 3 3
+sendMessage 0 first
+allClear
+crashServer 1
+crashServer 2
+sendMessage 1 second
+restartServer 1
+crashServer 0
+sendMessage 0 third
+restartServer 2
+allClear
+printChatLog 0
+printChatLog 1
+printChatLog 2
