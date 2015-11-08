@@ -79,21 +79,6 @@ void Acceptor::RemoveFromCommanderFDSet(const int fd) {
  */
 void Acceptor::GetCommanderFdSet(fd_set& cfds_set, int& fd_max, std::vector<int> &cfds_vec)
 {
-    // int fd_temp;
-    // cfds_vec.clear();
-    // fd_max = INT_MIN;
-    // set<int> local_set = get_commander_fd_set();
-    // FD_ZERO(&cfds_set);
-    // for (auto it = local_set.begin(); it != local_set.end(); it++)
-    // {
-    //     fd_temp = *it;
-    //     if (fd_temp != -1)
-    //     {
-    //         FD_SET(fd_temp, &cfds_set);
-    //         fd_max = max(fd_max, fd_temp);
-    //         cfds_vec.push_back(fd_temp);
-    //     }
-    // }
     char buf;
     int fd_temp;
     cfds_vec.clear();
@@ -213,14 +198,6 @@ void Acceptor::AcceptorMode(const int primary_id)
 
         int fd_max = INT_MIN, fd_temp;
         GetCommanderFdSet(recv_from, fd_max, fds);
-
-        // fd_temp = get_scout_fd(primary_id);
-        // if (fd_temp != -1)
-        // {
-        //     FD_SET(fd_temp, &recv_from);
-        //     fd_max = max(fd_max, fd_temp);
-        //     fds.push_back(fd_temp);
-        // }
 
         char buf;
         fd_temp = get_scout_fd(primary_id);

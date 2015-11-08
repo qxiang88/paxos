@@ -1,0 +1,9 @@
+start 3 3
+sendMessage 0 first
+allClear
+timeBombLeader 2
+sendMessage 0 second
+allClear
+printChatLog 0
+printChatLog 1
+printChatLog 2

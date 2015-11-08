@@ -27,6 +27,8 @@ using namespace std;
 #endif // DEBUG
 
 extern char **environ;
+pthread_mutex_t primary_id_lock;
+pthread_mutex_t proceed_lock;
 
 int Master::get_server_fd(const int server_id) {
     return server_fd_[server_id];
@@ -57,7 +59,19 @@ int Master::get_client_pid(const int client_id) {
 }
 
 int Master::get_primary_id() {
-    return primary_id_;
+    int p_id;
+    pthread_mutex_lock(&primary_id_lock);
+    p_id = primary_id_;
+    pthread_mutex_unlock(&primary_id_lock);
+    return p_id;
+}
+
+bool Master::get_proceed() {
+    int p;
+    pthread_mutex_lock(&proceed_lock);
+    p = proceed_;
+    pthread_mutex_unlock(&proceed_lock);
+    return p;
 }
 
 int Master::get_num_servers() {
@@ -87,7 +101,15 @@ void Master::set_client_fd(const int client_id, const int fd) {
 }
 
 void Master::set_primary_id(const int primary_id) {
+    pthread_mutex_lock(&primary_id_lock);
     primary_id_ = primary_id;
+    pthread_mutex_unlock(&primary_id_lock);
+}
+
+void Master::set_proceed(const bool p) {
+    pthread_mutex_lock(&proceed_lock);
+    proceed_ = p;
+    pthread_mutex_unlock(&proceed_lock);
 }
 
 void Master::set_server_status(const int server_id, const Status s) {
@@ -193,10 +215,10 @@ void Master::ReadTest() {
                 return;
             if (!SpawnClients(num_clients_))
                 return;
-            // if (!ConnectToServersAndClients())
-            //     return;
             usleep(kGeneralSleep);
             usleep(kGeneralSleep);
+            pthread_t peek_server_activities_thread;
+            CreateThread(PeekServerActivities, (void*)this, peek_server_activities_thread);
         }
         if (keyword == kSendMessage) {
             int client_id;
@@ -212,11 +234,17 @@ void Master::ReadTest() {
         if (keyword == kCrashServer) {
             int server_id;
             iss >> server_id;
+            set_proceed(false);
             CrashServer(server_id);
-            if (server_id == get_primary_id()) {
-                NewPrimaryElection();
-                WaitForGoAhead(get_primary_id());
+            while (get_proceed() == false) {
+                usleep(kBusyWaitSleep);
             }
+            set_proceed(false);
+
+            // if (server_id == get_primary_id()) {
+            //     NewPrimaryElection();
+            //     WaitForGoAhead(get_primary_id());
+            // }
         }
         if (keyword == kRestartServer) {
             int server_id;
@@ -357,6 +385,11 @@ void Master::WaitForAllClearDone()
                                 D(cout << "M  : S" << serv_id << " is allClearDone" << endl;)
                                 waitfor--;
                             }
+                            else
+                            {
+                                D(cout << "M  : ERROR Unexpected message received from server S"
+                                  << serv_id << ": " << msg << endl;)
+                            }
                         }
                     }
                 }
@@ -399,36 +432,15 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
 }
 
 /**
- * sends timebomb message to primary and waits for suicide message
- * on receiving suicide from primary, it kills primary and elects new primary
+ * sends timebomb message to primary
  * @param num_messages primary's alloted quota of messages
  */
 void Master::TimeBombLeader(const int num_messages) {
     int primary_id = get_primary_id();
-    string msg = kTimeBomb + to_string(num_messages) + kMessageDelim;
+    string msg = kTimeBomb + kInternalDelim + to_string(num_messages) + kMessageDelim;
     SendMessageToServer(primary_id, msg);
-
-    char buf[kMaxDataSize];
-    int num_bytes;
-    num_bytes = recv(get_server_fd(primary_id), buf, kMaxDataSize - 1, 0);
-    if (num_bytes == -1) {
-        D(cout << "M  : ERROR in receiving Suicide message from primary S" << primary_id << endl;)
-    } else if (num_bytes == 0) {    // connection closed by master
-        D(cout << "M  : Connection closed by primary S" << primary_id << endl;)
-    } else {
-        buf[num_bytes] = '\0';
-        std::vector<string> msg = split(string(buf), kMessageDelim[0]);
-        for (auto &m : msg) {
-            if (m == kKillMe) {
-                CrashServer(primary_id);
-                NewPrimaryElection();
-            } else {
-                D(cout << "M  : ERROR Unexpected message received from primary S"
-                  << primary_id << ": " << m << endl;)
-            }
-        }
-    }
 }
+
 /**
  * performs all tasks related to new primary election
  * and informing servers and clients about the new primary
@@ -479,15 +491,6 @@ void Master::InformServersAboutNewPrimary() {
     }
 }
 
-// int Master::GetServerIdWithFd(int fd)
-// {
-//     vector<int> local = server_fd_;
-//     for(int i=0; i<local.size(); i++)
-//     {
-//         if(local[i]==fd) return i;
-//     }
-//     return -1;
-// }
 /**
  * receives chatlog from a client
  * @param client_id id of client from which chatlog is to be received
@@ -541,6 +544,8 @@ void Master::Initialize() {
     for (int i = 0; i < num_clients_; ++i) {
         fout_[i].open(kChatLogFile + to_string(i), ios::app);
     }
+
+    set_proceed(false);
 }
 
 /**
@@ -698,11 +703,11 @@ void Master::CrashServer(const int server_id)
     if (pid != -1) {
         // TODO: Think whether SIGKILL or SIGTERM
         // TODO: If using SIGTERM, consider signal handling in server.cpp
-        close(get_server_fd(server_id));
+        // close(get_server_fd(server_id));
         kill(pid, SIGKILL);
         set_server_pid(server_id, -1);
-        set_server_fd(server_id, -1);
-        set_server_status(server_id, DEAD);
+        // set_server_fd(server_id, -1);
+        // set_server_status(server_id, DEAD);
         D(cout << "M  : Server S" << server_id << " killed" << endl;)
     }
 }
@@ -766,14 +771,102 @@ void Master::SendMessageToServer(const int server_id, const string & message) {
     }
 }
 
+/**
+ * initializes all locks
+ */
+bool Master::InitializeLocks() {
+
+    if (pthread_mutex_init(&primary_id_lock, NULL) != 0) {
+        D(cout << "M  : Mutex init failed" << endl;)
+        return false;
+    }
+
+    if (pthread_mutex_init(&proceed_lock, NULL) != 0) {
+        D(cout << "M  : Mutex init failed" << endl;)
+        return false;
+    }
+    return true;
+}
+
+/**
+ * thread for peeking server activities to check if they are alive or dead
+ * if a primary dies, new primary election and wait for go ahead are executed
+ * if a non-primary dies
+ * @param _M pointer to Master class object
+ */
+void* PeekServerActivities(void *_M) {
+    Master *M = (Master*) _M;
+
+    fd_set server_set;
+    int fd_max, num_bytes;
+    int num_servers = M->get_num_servers();
+    char buf;
+
+    std::vector<int> fds;
+    while (true) {
+        M->GetServerFdSet(server_set, fds, fd_max);
+
+        if (fd_max == INT_MIN) {
+            usleep(kBusyWaitSleep);
+            continue;
+        }
+
+        struct timeval timeout = kSelectTimeoutTimeval;
+        int rv = select(fd_max + 1, &server_set, NULL, NULL, &timeout);
+
+        if (rv == -1) { //error in select
+            D(cout << "M  : ERROR in select() while peeking servers" << endl;)
+        } else if (rv == 0) {
+            // D(cout << "M  : ERROR: Unexpected timeout in select() while waiting for all clear" << endl;)
+        } else {
+            for (int i = 0; i < fds.size(); i++) {
+                int serv_id = M->GetServerIdFromFd(fds[i]);
+
+                if (M->get_server_status(serv_id) == DEAD)
+                    continue;
+
+                if (FD_ISSET(fds[i], &server_set)) { // we got one!!
+                    num_bytes = recv(M->get_server_fd(serv_id), &buf, 1, MSG_DONTWAIT | MSG_PEEK);
+                    if (num_bytes == 0) {  // connection closed by server
+                        if (serv_id == M->get_primary_id()) {
+                            // if a primary dies, it might have been because of timeBombLeader
+                            // master might not have closed and reset its fd/pid/status yet
+                            close(M->get_server_fd(serv_id));
+                            M->set_server_pid(serv_id, -1);
+                            M->set_server_fd(serv_id, -1);
+                            M->set_server_status(serv_id, DEAD);
+
+                            M->NewPrimaryElection();
+                            M->WaitForGoAhead(M->get_primary_id());
+                        } else {
+                            // if a non-primary dies, master must have called crashServer on it
+                            // no need to close and set fd/status/pid again.
+                            close(M->get_server_fd(serv_id));
+                            M->set_server_fd(serv_id, -1);
+                            M->set_server_status(serv_id, DEAD);
+                        }
+
+                        M->set_proceed(true);
+                    } else {
+                        // some valid activity detected. Ignore
+                    }
+                }
+            }
+        }
+    }
+    return NULL;
+}
+
 int main() {
     signal(SIGPIPE, SIG_IGN);
 
     Master M;
+    if (!M.InitializeLocks())
+        return 1;
     M.ReadTest();
 
     usleep(18000 * 1000);
-    cout << "Master crashing all" << endl;
+    cout << "M  : GOODBYE. Killing everyone..." << endl;
     M.KillAllServers();
     M.KillAllClients();
     return 0;

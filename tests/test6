@@ -1,14 +1,16 @@
 start 3 3
 sendMessage 0 first
-sendMessage 1 second
 allClear
 crashServer 1
-sendMessage 0 third
-sendMessage 2 forth
-allClear
 crashServer 2
+sendMessage 0 second
 restartServer 1
-sendMessage 2 fifth
+crashServer 0
+sendMessage 2 third
+restartServer 2
+crashServer 1
+sendMessage 1 forth
+restartServer 0
 allClear
 printChatLog 0
 printChatLog 1

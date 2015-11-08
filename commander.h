@@ -22,7 +22,7 @@ public:
     void SendDecision(const Triple &t);
     void SendPreEmpted(const Ballot& b);
     void SendToServers(const string& type, const string& msg);
-    void ConnectToAllAcceptors(std::vector<int> &acceptor_peer_fd);
+    int ConnectToAllAcceptors(std::vector<int> &acceptor_peer_fd);
     void GetAcceptorFdSet(fd_set& acceptor_set, vector<int>& fds, int& fd_max);
     void Unicast(const string &type, const string& msg);
     void CloseAllConnections();

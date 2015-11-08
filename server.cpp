@@ -19,6 +19,7 @@ pthread_mutex_t replica_ready_lock;
 pthread_mutex_t leader_ready_lock;
 pthread_mutex_t acceptor_ready_lock;
 pthread_mutex_t all_clear_lock;
+pthread_mutex_t message_quota_lock;
 
 #define DEBUG
 
@@ -153,6 +154,14 @@ Scout* Server:: get_scout_object() {
     return scout_object_;
 }
 
+int Server::get_message_quota() {
+    int quota;
+    pthread_mutex_lock(&message_quota_lock);
+    quota = message_quota_;
+    pthread_mutex_unlock(&message_quota_lock);
+    return quota;
+}
+
 void Server::set_mode(Status m) {
     pthread_mutex_lock(&mode_lock);
     mode_ = m;
@@ -207,6 +216,12 @@ void Server::set_acceptor_ready(bool b) {
     pthread_mutex_lock(&acceptor_ready_lock);
     acceptor_ready_ = b;
     pthread_mutex_unlock(&acceptor_ready_lock);
+}
+
+void Server::set_message_quota(const int num_messages) {
+    pthread_mutex_lock(&message_quota_lock);
+    message_quota_ = num_messages;
+    pthread_mutex_unlock(&message_quota_lock);
 }
 
 /**
@@ -367,6 +382,9 @@ void Server::Initialize(const int pid,
     if (pthread_mutex_init(&acceptor_ready_lock, NULL) != 0) {
         D(cout << "S" << get_pid() << " : Mutex init failed" << endl;)
     }
+    if (pthread_mutex_init(&message_quota_lock, NULL) != 0) {
+        D(cout << "S" << get_pid() << " : Mutex init failed" << endl;)
+    }
 
     set_all_clear(kLeaderRole, kAllClearNotSet);
     set_all_clear(kReplicaRole, kAllClearNotSet);
@@ -374,6 +392,8 @@ void Server::Initialize(const int pid,
     set_leader_ready(false);
     set_replica_ready(false);
     set_acceptor_ready(false);
+
+    set_message_quota(INT_MAX);
 }
 
 /**
@@ -455,6 +475,9 @@ void Server::HandleNewPrimary(const int new_primary_id) {
     SendGoAheadToMaster();
 }
 
+/**
+ * sends GoAhead message to master
+ */
 void Server::SendGoAheadToMaster() {
     string message = kGoAhead + kInternalDelim + kMessageDelim;
     if (send(get_master_fd(), message.c_str(), message.size(), 0) == -1) {
@@ -462,6 +485,32 @@ void Server::SendGoAheadToMaster() {
     } else {
         D(cout << "S" << get_pid() << " : GOAHEAD sent to master" << endl;)
     }
+}
+
+void Server::Die() {
+    D(cout << "S" << get_pid() << " : Going down..." <<  endl;)
+    close(get_master_fd());
+    exit(1);
+}
+
+/**
+ * checks whether the server has exhausted its message quota or not
+ * it the message quota has been exhausted, then it sends a KillMe message to master
+ * it sleeps after sending KillMe to master, untill the master kills the process
+ */
+void Server::ContinueOrDie() {
+    if (get_message_quota() <= 0) {
+        Die();
+    }
+}
+
+/**
+ * decrements the message quota by 1
+ * after decrementing, it checks whether or not has it exhausted its message quota
+ */
+void Server::DecrementMessageQuota() {
+    set_message_quota(get_message_quota() - 1);
+    ContinueOrDie();
 }
 
 void* ReceiveMessagesFromMaster(void* _S ) {
@@ -484,12 +533,14 @@ void* ReceiveMessagesFromMaster(void* _S ) {
                 if (token[0] == kAllClear) {
                     S->AllClearPhase(); //send to (leader)x and replica
                 }
-                else if (token[0] == kAllClearRemove)
-                {
+                else if (token[0] == kAllClearRemove) {
                     S->FinishAllClear();
                 } else if (token[0] == kNewPrimary) {
                     D(cout << "S" << S->get_pid() << " : Received new primary id S" << token[1] << endl;)
                     S->HandleNewPrimary(stoi(token[1]));
+                } else if (token[0] == kTimeBomb) {
+                    D(cout << "S" << S->get_pid() << " : Received TimeBomb " << token[1] << endl;)
+                    S->set_message_quota(stoi(token[1]));
                 } else {    //other messages
                     D(cout << "S" << S->get_pid() << " : ERROR Unexpected message received from M" << endl;)
                 }

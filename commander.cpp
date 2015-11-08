@@ -98,6 +98,8 @@ void Commander::SendP2a(const Triple &t, const vector<int> &acceptor_peer_fd)
     int serv_fd;
     for (int i = 0; i < S->get_num_servers(); i++)
     {
+        S->ContinueOrDie();
+
         serv_fd = get_acceptor_fd(i);
         
         if (serv_fd == -1) {
@@ -117,6 +119,8 @@ void Commander::SendP2a(const Triple &t, const vector<int> &acceptor_peer_fd)
             D(cout << "SC" << S->get_pid()
               << ": P2A message sent to acceptor S" << i << ": " << msg << endl;)
         }
+
+        S->DecrementMessageQuota();
     }
 }
 
@@ -135,8 +139,14 @@ void Commander::SendPreEmpted(const Ballot& b)
     Unicast(kPreEmpted, msg);
 }
 
-void Commander::ConnectToAllAcceptors(std::vector<int> &acceptor_peer_fd) {
+/**
+ * connects to all acceptors, and gets their fds
+ * @param  acceptor_peer_fd [out] peer fds of commander-acceptor connection
+ * @return                  num of alive acceptors with which this exchange was successfull
+ */
+int Commander::ConnectToAllAcceptors(std::vector<int> &acceptor_peer_fd) {
     int num_servers = S->get_num_servers();
+    int num_alive_acceptors = 0;
 
     for (int i = 0; i < num_servers; ++i) {
         if (!ConnectToAcceptor(i)) {
@@ -161,9 +171,11 @@ void Commander::ConnectToAllAcceptors(std::vector<int> &acceptor_peer_fd) {
                   ": Received fd from acceptor S" << i << endl;)
                 // acceptor side fd of this connection received.
                 acceptor_peer_fd[i] = atoi(buf);
+                num_alive_acceptors++;
             }
         }
     }
+    return num_alive_acceptors;
 }
 
 void Commander::GetAcceptorFdSet(fd_set& acceptor_set, vector<int>& fds, int& fd_max)
@@ -215,7 +227,19 @@ void* CommanderMode(void* _rcv_thread_arg) {
     int num_servers = C->S->get_num_servers();
 
     std::vector<int> acceptor_peer_fd(num_servers, -1);
-    C->ConnectToAllAcceptors(acceptor_peer_fd);
+    int num_alive_acceptors = C->ConnectToAllAcceptors(acceptor_peer_fd);
+    
+    if ((float)num_alive_acceptors < (num_servers / 2.0)) {
+        // won't send P2a to anyone since only a minority is alive
+        D(cout << "SC" << C->S->get_pid()
+          << ": Exiting because only minority of acceptors are alive" << endl;)
+        usleep(kMinoritySleep);
+
+        Triple no_op(toSend.b, toSend.s, Proposal(to_string(0),to_string(0),kNoop));
+        C->SendDecision(no_op);
+        return NULL;
+    }
+
     C->SendP2a(toSend, acceptor_peer_fd);
 
     int num_bytes;

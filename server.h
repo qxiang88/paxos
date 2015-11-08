@@ -38,6 +38,9 @@ public:
     void FinishAllClear();
     void HandleNewPrimary(const int new_primary_id);
     void SendGoAheadToMaster();
+    void Die();
+    void ContinueOrDie();
+    void DecrementMessageQuota();
 
     bool get_leader_ready();
     bool get_replica_ready();
@@ -59,6 +62,7 @@ public:
     int get_replica_port(const int server_id);
     int get_leader_port(const int server_id);
     int get_primary_id();
+    int get_message_quota();
     Scout* get_scout_object();
     int get_master_fd();
     Status get_mode();
@@ -72,6 +76,7 @@ public:
     void set_primary_id(const int primary_id);
     void set_scout_object();
     void set_all_clear(string, string);
+    void set_message_quota(const int num_messages);
 
 private:
     int pid_;   // server's ID
@@ -83,6 +88,7 @@ private:
     bool acceptor_ready_;
     bool replica_ready_;
     Status mode_;
+    int message_quota_;
 
     int master_fd_;
 

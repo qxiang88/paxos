@@ -1,13 +1,13 @@
 start 3 3
-sendMessage 0 msg_from_first
-sendMessage 1 msg_from_second
+sendMessage 0 first
+sendMessage 1 second
 allClear
 crashServer 1
-sendMessage 0 msg_from_third
-sendMessage 2 msg_from_forth
+sendMessage 0 third
+sendMessage 2 forth
 allClear
 crashServer 0
-sendMessage 2 msg_from_fifth
+sendMessage 2 fifth
 allClear
 printChatLog 0
 printChatLog 1

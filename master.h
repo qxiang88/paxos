@@ -6,6 +6,8 @@
 #include "iostream"
 using namespace std;
 
+void* PeekServerActivities(void *_M);
+
 typedef enum {
     DEAD, RUNNING, RECOVER
 } Status;
@@ -36,7 +38,6 @@ public:
     void WaitForAllClearDone();
     void GetServerFdSet(fd_set& server_fd_set, vector<int>& fds, int& fd_max);
     void ConstructAllClearMessage(string &message, const string& type);
-    // int GetServerIdWithFd(int);
     void NewPrimaryElection();
     void ElectNewPrimary();
     void InformClientsAboutNewPrimary();
@@ -46,6 +47,7 @@ public:
     int GetServerIdFromFd(int fd);
     bool RestartServer(const int server_id);
     void SetCloseExecFlag(const int fd);
+    bool InitializeLocks();
 
     int get_server_fd(const int server_id);
     int get_client_fd(const int client_id);
@@ -56,6 +58,7 @@ public:
     int get_client_pid(const int client_id);
     int get_primary_id();
     int get_num_servers();
+    bool get_proceed();
     Status get_server_status(const int server_id);
 
     void set_server_pid(const int server_id, const int pid);
@@ -64,7 +67,7 @@ public:
     void set_client_fd(const int client_id, const int fd);
     void set_primary_id(const int primary_id);
     void set_server_status(const int server_id, const Status s);
-
+    void set_proceed(const bool p);
 private:
     int num_servers_;
     int num_clients_;
@@ -72,6 +75,7 @@ private:
 
     ofstream* fout_;
     std::vector<Status> server_status_;
+    bool proceed_;
 
     std::vector<int> server_pid_;
     std::vector<int> client_pid_;

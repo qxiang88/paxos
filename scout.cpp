@@ -65,8 +65,9 @@ int Scout::SendToServers(const string& type, const string& msg)
     int num_send = 0;
     for (int i = 0; i < S->get_num_servers(); i++)
     {
-        int serv_id = get_acceptor_fd(i);
+        S->ContinueOrDie();
 
+        int serv_id = get_acceptor_fd(i);
         if (serv_id != -1)
         {
             if (send(serv_id, msg.c_str(), msg.size(), 0) == -1) {
@@ -79,6 +80,8 @@ int Scout::SendToServers(const string& type, const string& msg)
                 num_send++;
             }
         }
+
+        S->DecrementMessageQuota();
     }
     return num_send;
 }
@@ -140,12 +143,39 @@ int Scout::GetServerIdFromFd(int fd)
         }
     }
 }
+
 void Scout::CloseAndUnSetAcceptor(int id)
 {
     close(get_acceptor_fd(id));
     set_acceptor_fd(id, -1);
 
 }
+
+/**
+ * counts and returns the number of acceptors currently alive
+ * @return number of alive acceptors
+ */
+int Scout::CountAcceptorsAlive() {
+    char buf;
+    int rv;
+    int count = 0;
+    for (int i = 0; i < S->get_num_servers(); ++i)
+    {
+        int fd_temp = get_acceptor_fd(i);
+        if (fd_temp == -1)
+            continue;
+
+        rv = recv(fd_temp, &buf, 1, MSG_DONTWAIT | MSG_PEEK);
+        if (rv == 0) {
+            close(fd_temp);
+            set_acceptor_fd(i, -1);
+        } else {
+            count++;
+        }
+    }
+    return count;
+}
+
 void* ScoutMode(void* _rcv_thread_arg) {
     signal(SIGPIPE, SIG_IGN);
 
@@ -155,13 +185,19 @@ void* ScoutMode(void* _rcv_thread_arg) {
     time_t sleep_time = rcv_thread_arg->sleep_time;
 
     usleep(sleep_time);
+    int num_servers = SC->S->get_num_servers();
+    int num_send;
 
-    int num_send = SC->SendP1a(ball);   // number of servers to which p1a successfully sent
+    int num_alive_acceptors = SC->CountAcceptorsAlive();
+    if ((float)num_alive_acceptors < (num_servers / 2.0)) {
+        num_send = 0;   // won't send to anyone since only a minority is alive
+    } else {
+        num_send = SC->SendP1a(ball);   // number of servers to which p1a successfully sent
+    }
 
     int num_bytes;
     unordered_set<Triple> pvalues;
 
-    int num_servers = SC->S->get_num_servers();
     int waitfor = num_servers;
     vector<int> fds;
     while (num_send) {  // always listen to messages from the acceptors

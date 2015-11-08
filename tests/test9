@@ -1,10 +1,11 @@
 start 3 3
-crashServer 0
-crashServer 2
-sendMessage 1 first
+timeBombLeader 2
+sendMessage 0 first
+allClear
+timeBombLeader 2
+sendMessage 1 second
 allClear
 restartServer 0
-sendMessage 2 second
 allClear
 printChatLog 0
 printChatLog 1

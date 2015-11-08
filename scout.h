@@ -25,7 +25,8 @@ public:
     void Unicast(const string &type, const string& msg);
     void CloseAndUnSetAcceptor(int id);
     int GetServerIdFromFd(int fd);
-    
+    int CountAcceptorsAlive();
+
     int get_leader_fd(const int server_id);
     int get_replica_fd(const int server_id);
     int get_acceptor_fd(const int server_id);
