@@ -75,6 +75,10 @@ int Server::get_acceptor_listen_port(const int server_id) {
     return acceptor_listen_port_[server_id];
 }
 
+int Server::get_leader_listen_port(const int server_id) {
+    return leader_listen_port_[server_id];
+}
+
 int Server::get_replica_listen_port(const int server_id) {
     return replica_listen_port_[server_id];
 }
@@ -297,6 +301,9 @@ bool Server::ReadPortsFile() {
             acceptor_listen_port_[i] = port;
 
             fin >> port;
+            leader_listen_port_[i] = port;
+
+            fin >> port;
             acceptor_port_[i] = port;
             acceptor_port_map_.insert(make_pair(port, i));
 
@@ -327,9 +334,10 @@ bool Server::ReadPortsFile() {
 void Server::Initialize(const int pid,
                         const int num_servers,
                         const int num_clients,
-                        int mode) {
+                        int mode,
+                        int primary_id) {
     set_pid(pid);
-    set_primary_id(0);
+    set_primary_id(primary_id);
     num_servers_ = num_servers;
     num_clients_ = num_clients;
     mode_ = static_cast<Status>(mode);
@@ -340,6 +348,7 @@ void Server::Initialize(const int pid,
     scout_listen_port_.resize(num_servers_);
     replica_listen_port_.resize(num_servers_);
     acceptor_listen_port_.resize(num_servers_);
+    leader_listen_port_.resize(num_servers_);
 
     client_chat_port_.resize(num_clients_);
     acceptor_port_.resize(num_servers_);
@@ -440,8 +449,7 @@ void Server::HandleNewPrimary(const int new_primary_id) {
         usleep(kBusyWaitSleep);
     }
 
-    if (get_leader_ready() && get_acceptor_ready() && get_replica_ready())
-        set_leader_ready(false);
+    set_leader_ready(false);
     set_acceptor_ready(false);
     set_replica_ready(false);
     SendGoAheadToMaster();
@@ -495,7 +503,7 @@ int main(int argc, char *argv[]) {
     signal(SIGPIPE, SIG_IGN);
 
     Server S;
-    S.Initialize(atoi(argv[1]), atoi(argv[2]), atoi(argv[3]), atoi(argv[4]));
+    S.Initialize(atoi(argv[1]), atoi(argv[2]), atoi(argv[3]), atoi(argv[4]), atoi(argv[5]));
     if (!S.ReadPortsFile()) {
         return 1;
     }

@@ -19,6 +19,7 @@ public:
     bool ConnectToCommander(const int server_id);
     bool ConnectToScout(const int server_id);
     bool ConnectToReplica(const int server_id);
+    bool ConnectToLeader(const int server_id);
     void Propose(const Proposal &p, const int primary_id);
     void SendProposal(const int& s, const Proposal& p, const int primary_id);
     void Perform(const int& slot, const Proposal& p, const int primary_id);

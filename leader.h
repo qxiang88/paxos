@@ -10,6 +10,7 @@
 using namespace std;
 
 void *LeaderEntry(void *_S);
+void* AcceptConnectionsLeader(void* _L);
 
 class Leader {
 public:

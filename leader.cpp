@@ -86,7 +86,7 @@ void Leader::set_leader_active(const bool b) {
 /**
  * increments the value of ballot_num_
  */
- void Leader::IncrementBallotNum() {
+void Leader::IncrementBallotNum() {
     Ballot b = get_ballot_num();
     b.seq_num++;
     set_ballot_num(b);
@@ -135,7 +135,7 @@ void Leader::SendReplicasAllDecisions()
         }
         else {
             D(cout << "SL" << S->get_pid()
-              << ": All Decisions sent to replica "<<i<<": " << msg << endl;)
+              << ": All Decisions sent to replica " << i << ": " << msg << endl;)
         }
     }
 }
@@ -145,12 +145,13 @@ void Leader::SendReplicasAllDecisions()
  * @param  _S pointer to server class object
  * @return    NULL
  */
- void* LeaderEntry(void *_S) {
+void* LeaderEntry(void *_S) {
     signal(SIGPIPE, SIG_IGN);
-    
+
     Leader L((Server*)_S);
 
-    // does not need accept threads since it does not listen to connections from anyone
+    pthread_t accept_connections_thread;
+    CreateThread(AcceptConnectionsLeader, (void*)&L, accept_connections_thread);
 
     // sleep for some time to make sure accept threads of commanders,scouts,replica are running
     usleep(kGeneralSleep);
@@ -174,17 +175,17 @@ void Leader::SendReplicasAllDecisions()
         return NULL;
     }
 
-    for (int i = 0; i < L.S->get_num_servers(); i++)
-    {
+    // for (int i = 0; i < L.S->get_num_servers(); i++)
+    // {
 
-        if (L.ConnectToReplica(i)) {
-            D(cout << "SL" << L.S->get_pid() << ": Connected to replica of S"
-              << i << endl;)
-        } else {
-            // D(cout << "SL" << L.S->get_pid() << ": ERROR in connecting to replica of S"
-              // << i << endl;)
-        }
-    }
+    //     if (L.ConnectToReplica(i)) {
+    //         D(cout << "SL" << L.S->get_pid() << ": Connected to replica of S"
+    //           << i << endl;)
+    //     } else {
+    //         // D(cout << "SL" << L.S->get_pid() << ": ERROR in connecting to replica of S"
+    //           // << i << endl;)
+    //     }
+    // }
 
     usleep(kGeneralSleep);
     usleep(kGeneralSleep);
@@ -192,14 +193,17 @@ void Leader::SendReplicasAllDecisions()
 
     L.S->set_leader_ready(true);
     L.LeaderMode();
+    
+    void *status;
+    pthread_join(accept_connections_thread, &status);
     return NULL;
 }
 
 /**
  * function for performing leader related job
  */
- void Leader::LeaderMode()
- {
+void Leader::LeaderMode()
+{
     // scout
     pthread_t scout_thread;
     ScoutThreadArgument* arg = new ScoutThreadArgument;
@@ -225,7 +229,7 @@ void Leader::SendReplicasAllDecisions()
                     pthread_join(*cit, &status);
                 }
                 commanders_.clear();
-                D(cout<<"SL"<<S->get_pid()<<" :Leader joined all commanders"<<endl;)
+                D(cout << "SL" << S->get_pid() << " :Leader joined all commanders" << endl;)
             }
         }
 
@@ -258,19 +262,19 @@ void Leader::SendReplicasAllDecisions()
                                 D(cout << "SL" << S->get_pid() << ": Propose message received: " << msg <<  endl;)
                                 // if (proposals_.find(stoi(token[1])) == proposals_.end())
                                 // {
-                                    proposals_[stoi(token[1])] = stringToProposal(token[2]);
-                                    if (get_leader_active())
-                                    {
-                                        // commander
-                                        pthread_t commander_thread;
-                                        Commander *C = new Commander(S);
-                                        CommanderThreadArgument* arg = new CommanderThreadArgument;
-                                        arg->C = C;
-                                        Triple tempt = Triple(get_ballot_num(), stoi(token[1]), proposals_[stoi(token[1])]);
-                                        arg->toSend = tempt;
-                                        CreateThread(CommanderMode, (void*)arg, commander_thread);
-                                        commanders_.push_back(commander_thread);
-                                    }
+                                proposals_[stoi(token[1])] = stringToProposal(token[2]);
+                                if (get_leader_active())
+                                {
+                                    // commander
+                                    pthread_t commander_thread;
+                                    Commander *C = new Commander(S);
+                                    CommanderThreadArgument* arg = new CommanderThreadArgument;
+                                    arg->C = C;
+                                    Triple tempt = Triple(get_ballot_num(), stoi(token[1]), proposals_[stoi(token[1])]);
+                                    arg->toSend = tempt;
+                                    CreateThread(CommanderMode, (void*)arg, commander_thread);
+                                    commanders_.push_back(commander_thread);
+                                }
                                 // }
                             }
                             else if (token[0] == kAdopted)
@@ -315,14 +319,14 @@ void Leader::SendReplicasAllDecisions()
                                     arg->sleep_time = 0;
                                     CreateThread(ScoutMode, (void*)arg, scout_thread);
                                 }
-                                else if(recvd_b == get_ballot_num())     // minority of acceptors alive
+                                else if (recvd_b == get_ballot_num())    // minority of acceptors alive
                                 {
                                     set_leader_active(false);
                                     // scout
                                     ScoutThreadArgument* arg = new ScoutThreadArgument;
                                     arg->SC = S->get_scout_object();
                                     arg->ball = get_ballot_num();
-                                    arg->sleep_time = 2*kGeneralSleep;
+                                    arg->sleep_time = 2 * kGeneralSleep;
                                     CreateThread(ScoutMode, (void*)arg, scout_thread);
                                 }
                             }

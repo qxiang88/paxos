@@ -95,7 +95,7 @@ void Master::set_server_status(const int server_id, const Status s) {
 }
 
 void Master::SetCloseExecFlag(const int fd) {
-    if(fd == -1)
+    if (fd == -1)
         return;
 
     int flags;
@@ -161,7 +161,7 @@ bool Master::ReadPortsFile() {
         for (int i = 0; i < num_servers_; i++) {
             fin >> port;
             server_listen_port_[i] = port;
-            for (int j = 0; j < 7; ++j) {
+            for (int j = 0; j < 8; ++j) {
                 fin >> port;
             }
         }
@@ -221,6 +221,8 @@ void Master::ReadTest() {
         if (keyword == kRestartServer) {
             int server_id;
             iss >> server_id;
+            if (get_server_status(server_id) != DEAD)
+                continue;
             if (!RestartServer(server_id))
                 return;
 
@@ -552,6 +554,7 @@ bool Master::RestartServer(const int server_id) {
 
     // sleep for some time to make sure accept threads of the server are running
     usleep(kGeneralSleep);
+    usleep(kGeneralSleep);
     if (ConnectToServer(server_id)) {
         D(cout << "M  : Connected to server S" << server_id << endl;)
     } else {
@@ -572,7 +575,8 @@ bool Master::SpawnServers(const int n) {
             return false;
     }
 
-        // sleep for some time to make sure accept threads of servers are running
+    // sleep for some time to make sure accept threads of servers are running
+    usleep(kGeneralSleep);
     usleep(kGeneralSleep);
     for (int i = 0; i < n; ++i) {
         if (ConnectToServer(i)) {
@@ -596,10 +600,12 @@ bool Master::SpawnOneServer(const int server_id, Status mode) {
     char server_id_arg[10];
     char num_servers_arg[10];
     char num_clients_arg[10];
+    char primary_id_arg[10];
     char mode_arg[10];
     sprintf(server_id_arg, "%d", server_id);
     sprintf(num_servers_arg, "%d", num_servers_);
     sprintf(num_clients_arg, "%d", num_clients_);
+    sprintf(primary_id_arg, "%d", get_primary_id());
 
     if (mode == RECOVER)
         sprintf(mode_arg, "%d", 2);
@@ -611,6 +617,7 @@ bool Master::SpawnOneServer(const int server_id, Status mode) {
                     num_servers_arg,
                     num_clients_arg,
                     mode_arg,
+                    primary_id_arg,
                     NULL
                    };
     status = posix_spawn(&pid,
@@ -763,7 +770,6 @@ int main() {
     Master M;
     M.ReadTest();
 
-    // while(1);
     usleep(18000 * 1000);
     cout << "Master crashing all" << endl;
     M.KillAllServers();

@@ -123,14 +123,13 @@ bool Master::ConnectToServer(const int server_id) {
         errno = 0;
         if (connect(sockfd, l->ai_addr, l->ai_addrlen) == -1) {
             close(sockfd);
-            cout << errno << endl;
+            D(cout << "M  : ERROR in connect-" << errno << ":" << strerror(errno) << endl;)
             continue;
         }
 
         break;
     }
     if (l == NULL) {
-        cout<<"ERROR"<<endl;
         return false;
     }
     // int outgoing_port = ntohs(return_port_no((struct sockaddr *)l->ai_addr));

@@ -23,9 +23,10 @@ typedef enum {
 class Server {
 public:
     void Initialize(const int pid,
-        const int num_servers,
-        const int num_clients,
-        int mode);
+                    const int num_servers,
+                    const int num_clients,
+                    int mode,
+                    int primary_id);
     int IsReplicaPort(const int port);
     int IsAcceptorPort(const int port);
     int IsLeaderPort(const int port);
@@ -52,11 +53,12 @@ public:
     int get_scout_listen_port(const int server_id);
     int get_replica_listen_port(const int server_id);
     int get_acceptor_listen_port(const int server_id);
+    int get_leader_listen_port(const int server_id);
     int get_client_chat_port(const int client_id);
     int get_acceptor_port(const int server_id);
     int get_replica_port(const int server_id);
     int get_leader_port(const int server_id);
-    int get_primary_id();  // common
+    int get_primary_id();
     Scout* get_scout_object();
     int get_master_fd();
     Status get_mode();
@@ -93,6 +95,7 @@ private:
     std::vector<int> scout_listen_port_;
     std::vector<int> replica_listen_port_;
     std::vector<int> acceptor_listen_port_;
+    std::vector<int> leader_listen_port_;
 
     std::vector<int> client_chat_port_;
     std::vector<int> acceptor_port_;

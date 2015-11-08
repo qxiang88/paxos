@@ -508,7 +508,8 @@ void Replica::ResendProposals(const int primary_id) {
     if (S->get_pid() != primary_id)
         return;
 
-    for (auto &p : proposals_) {
+    std::map<int, Proposal> proposals_copy = proposals_;
+    for (auto &p : proposals_copy) {
         if (decisions_.find(p.first) == decisions_.end()) {
             Propose(p.second, primary_id);
         }
@@ -628,9 +629,17 @@ void* ReplicaEntry(void *_S) {
             return NULL;
         }
 
+        int upper_bound;
+        if(R.S->get_mode() == RECOVER)
+            upper_bound = R.S->get_num_servers();
+        else
+            upper_bound = R.S->get_pid();
 
-        for (int i = 0; i < R.S->get_pid(); i++)
-        {   if (R.get_replica_fd(i) != -1) //if not already connected
+        for (int i = 0; i < upper_bound; i++)
+        {   
+            if(R.S->get_pid() == i)
+                continue;
+            if (R.get_replica_fd(i) != -1) //if not already connected
                 continue;
             if (R.ConnectToReplica(i)) {
                 D(cout << "SR" << R.S->get_pid() << ": Connected to replica of S"
@@ -641,6 +650,16 @@ void* ReplicaEntry(void *_S) {
                 //return NULL; removed because replica may not be there sometimes
             }
         }
+
+        if (R.ConnectToLeader(primary_id)) {
+            D(cout << "SR" << R.S->get_pid() << ": Connected to leader of S"
+              << primary_id << endl;)
+        } else {
+            D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to leader of S"
+              << primary_id << endl;)
+            return NULL;
+        }
+
         // sleep for some time to make sure all connections are established
         usleep(kGeneralSleep);
         usleep(kGeneralSleep);

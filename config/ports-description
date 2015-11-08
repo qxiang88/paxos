@@ -16,24 +16,27 @@
 13000   //scout 0 listen
 14000   //replica 0 listen
 15000   //acceptor 0 listen
-16000   //acceptor 0
-17000   //replica 0
-18000   //leader 0
+16000   //leader 0 listen
+17000   //acceptor 0
+18000   //replica 0
+19000   //leader 0
 
 11001   //server 1 listen
 12001   //commander 1 listen
 13001   //scout 1 listen
 14001   //replica 1 listen
 15001   //acceptor 1 listen
-16001   //acceptor 1
-17001   //replica 1
-18001   //leader 1
+16001   //leader 1 listen
+17001   //acceptor 1
+18001   //replica 1
+19001   //leader 1
 
 11002   //server 2 listen
 12002   //commander 2 listen
 13002   //scout 2 listen
 14002   //replica 2 listen
 15002   //acceptor 2 listen
-16002   //acceptor 2
-17002   //replica 2
-18002   //leader 2
+16002   //leader 2 listen
+17002   //acceptor 2
+18002   //replica 2
+19002   //leader 2

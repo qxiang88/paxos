@@ -105,7 +105,7 @@ bool Client::ReadPortsFile() {
             fin >> port >> port >> port;
             fin >> port;
             primary_listen_port_[i] = port;
-            fin >> port >> port >> port >> port;
+            fin >> port >> port >> port >> port >> port;
         }
 
         fin.close();
