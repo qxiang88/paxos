@@ -16,6 +16,7 @@ public:
     void ReadTest();
     void Initialize();
     bool SpawnServers(const int n);
+    bool SpawnOneServer(const int server_id, Status mode);
     bool SpawnClients(const int n);
     void CrashServer(const int server_id);
     void CrashClient(const int client_id);
@@ -40,10 +41,11 @@ public:
     void ElectNewPrimary();
     void InformClientsAboutNewPrimary();
     void InformServersAboutNewPrimary();
-    void WaitForGoAhead();
+    void WaitForGoAhead(const int server_id);
     void CloseAndUnSetServer(int id);
     int GetServerIdFromFd(int fd);
-
+    bool RestartServer(const int server_id);
+    void SetCloseExecFlag(const int fd);
 
     int get_server_fd(const int server_id);
     int get_client_fd(const int client_id);

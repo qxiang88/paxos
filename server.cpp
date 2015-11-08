@@ -60,7 +60,7 @@ int Server::get_leader_port(const int server_id) {
 int Server::get_server_listen_port(const int server_id) {
     return server_listen_port_[server_id];
 }
-Status Server::get_mode(){
+Status Server::get_mode() {
     Status m;
     pthread_mutex_lock(&mode_lock);
     m = mode_;
@@ -149,7 +149,7 @@ Scout* Server:: get_scout_object() {
     return scout_object_;
 }
 
-void Server::set_mode(Status m){
+void Server::set_mode(Status m) {
     pthread_mutex_lock(&mode_lock);
     mode_ = m;
     pthread_mutex_unlock(&mode_lock);
@@ -211,7 +211,7 @@ void Server::set_acceptor_ready(bool b) {
  * @return      id of client whose chat port matches param port
  * @return      -1 if param port is not the chat port of any client
  */
- int Server::IsClientChatPort(const int port) {
+int Server::IsClientChatPort(const int port) {
     if (client_chat_port_map_.find(port) != client_chat_port_map_.end()) {
         return client_chat_port_map_[port];
     } else {
@@ -225,7 +225,7 @@ void Server::set_acceptor_ready(bool b) {
  * @return      id of server whose replica port matches param port
  * @return      -1 if param port is not the replica port of any server
  */
- int Server::IsReplicaPort(const int port) {
+int Server::IsReplicaPort(const int port) {
     if (replica_port_map_.find(port) != replica_port_map_.end()) {
         return replica_port_map_[port];
     } else {
@@ -239,7 +239,7 @@ void Server::set_acceptor_ready(bool b) {
  * @return      id of server whose leader port matches param port
  * @return      -1 if param port is not the leader port of any server
  */
- int Server::IsLeaderPort(const int port) {
+int Server::IsLeaderPort(const int port) {
     if (leader_port_map_.find(port) != leader_port_map_.end()) {
         return leader_port_map_[port];
     } else {
@@ -253,7 +253,7 @@ void Server::set_acceptor_ready(bool b) {
  * @return      id of server whose acceptor port matches param port
  * @return      -1 if param port is not the acceptor port of any server
  */
- int Server::IsAcceptorPort(const int port) {
+int Server::IsAcceptorPort(const int port) {
     if (acceptor_port_map_.find(port) != acceptor_port_map_.end()) {
         return acceptor_port_map_[port];
     } else {
@@ -265,7 +265,7 @@ void Server::set_acceptor_ready(bool b) {
  * reads ports-file and populates port related vectors/maps
  * @return true is ports-file was read successfully
  */
- bool Server::ReadPortsFile() {
+bool Server::ReadPortsFile() {
     ifstream fin;
     fin.exceptions ( ifstream::failbit | ifstream::badbit );
     try {
@@ -324,10 +324,10 @@ void Server::set_acceptor_ready(bool b) {
  * @param  num_servers number of servers
  * @param  num_clients number of clients
  */
- void Server::Initialize(const int pid,
-    const int num_servers,
-    const int num_clients,
-    int mode) {
+void Server::Initialize(const int pid,
+                        const int num_servers,
+                        const int num_clients,
+                        int mode) {
     set_pid(pid);
     set_primary_id(0);
     num_servers_ = num_servers;
@@ -348,14 +348,14 @@ void Server::set_acceptor_ready(bool b) {
 
     if (pthread_mutex_init(&all_clear_lock, NULL) != 0) {
         D(cout << "S" << get_pid() << " : Mutex init failed" << endl;)
-    }  
-    if (pthread_mutex_init(&replica_ready_lock, NULL)!=0){
+    }
+    if (pthread_mutex_init(&replica_ready_lock, NULL) != 0) {
         D(cout << "S" << get_pid() << " : Mutex init failed" << endl;)
     }
-    if (pthread_mutex_init(&leader_ready_lock, NULL)!=0){
+    if (pthread_mutex_init(&leader_ready_lock, NULL) != 0) {
         D(cout << "S" << get_pid() << " : Mutex init failed" << endl;)
     }
-    if (pthread_mutex_init(&acceptor_ready_lock, NULL)!=0){
+    if (pthread_mutex_init(&acceptor_ready_lock, NULL) != 0) {
         D(cout << "S" << get_pid() << " : Mutex init failed" << endl;)
     }
 
@@ -370,7 +370,7 @@ void Server::set_acceptor_ready(bool b) {
 /**
  * creates accept thread for commander
  */
- void Server::CommanderAcceptThread(Commander* C) {
+void Server::CommanderAcceptThread(Commander* C) {
     pthread_t accept_connections_thread;
     CreateThread(AcceptConnectionsCommander, (void*)C, accept_connections_thread);
 }
@@ -378,7 +378,7 @@ void Server::set_acceptor_ready(bool b) {
 /**
  * creates accept thread for scout
  */
- void Server::ScoutAcceptThread(Scout* SC) {
+void Server::ScoutAcceptThread(Scout* SC) {
     pthread_t accept_connections_thread;
     CreateThread(AcceptConnectionsScout, (void*)SC, accept_connections_thread);
 }
@@ -399,7 +399,7 @@ void Server::AllClearPhase()
     }
 
     string message = kAllClearDone + kInternalDelim + kMessageDelim;
-    if(get_master_fd()==-1)
+    if (get_master_fd() == -1)
     {
         return;
     }
@@ -421,12 +421,12 @@ void Server::FinishAllClear()
  * handles functions to be executed on receipt of new primary
  * @param new_primary_id id of the new primary elected
  */
- void Server::HandleNewPrimary(const int new_primary_id) {
+void Server::HandleNewPrimary(const int new_primary_id) {
     set_primary_id(new_primary_id);
-    
+
     if (get_pid() != get_primary_id())
         return;
-    
+
     Commander *C = new Commander(this, get_num_servers());
     CommanderAcceptThread(C);
 
@@ -440,8 +440,8 @@ void Server::FinishAllClear()
         usleep(kBusyWaitSleep);
     }
 
-    if(get_leader_ready() && get_acceptor_ready() && get_replica_ready())
-    set_leader_ready(false);
+    if (get_leader_ready() && get_acceptor_ready() && get_replica_ready())
+        set_leader_ready(false);
     set_acceptor_ready(false);
     set_replica_ready(false);
     SendGoAheadToMaster();

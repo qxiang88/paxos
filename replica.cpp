@@ -136,7 +136,7 @@ void Replica::Unicast(const string &type, const string& msg, const int primary_i
  * proposes the proposal to a leader
  * @param p Proposal to be proposed
  */
- void Replica::Propose(const Proposal &p, const int primary_id) {
+void Replica::Propose(const Proposal &p, const int primary_id) {
     for (auto it = decisions_.begin(); it != decisions_.end(); ++it ) {
         if (it->second == p)
             return;
@@ -161,8 +161,8 @@ void Replica::Unicast(const string &type, const string& msg, const int primary_i
  * @param s proposed slot num for this proposal
  * @param p proposal to be proposed
  */
- void Replica::SendProposal(const int& s, const Proposal& p, const int primary_id)
- {
+void Replica::SendProposal(const int& s, const Proposal& p, const int primary_id)
+{
     string msg = kPropose + kInternalDelim;
     msg += to_string(s) + kInternalDelim;
     msg += proposalToString(p) + kMessageDelim;
@@ -175,8 +175,8 @@ void Replica::Unicast(const string &type, const string& msg, const int primary_i
  * @param slot decided slot num
  * @param p    decided proposal
  */
- void Replica::Perform(const int& slot, const Proposal& p, const int primary_id)
- {
+void Replica::Perform(const int& slot, const Proposal& p, const int primary_id)
+{
     for (auto it = decisions_.begin(); it != decisions_.end(); it++)
     {
         if (it->second == p && it->first < get_slot_num())
@@ -195,10 +195,10 @@ void Replica::Unicast(const string &type, const string& msg, const int primary_i
  * @param s decided slot num
  * @param p proposal to be sent
  */
- void Replica::SendResponseToAllClients(const int& s,
-   const Proposal& p,
-   const int primary_id)
- {
+void Replica::SendResponseToAllClients(const int& s,
+                                       const Proposal& p,
+                                       const int primary_id)
+{
     if (S->get_pid() != primary_id)
         return;
 
@@ -251,7 +251,7 @@ void Replica::CheckReceivedAllDecisions(map<int, Proposal>& allDecisions)
 }
 
 void Replica::CreateFdSet(fd_set& fromset, vector<int> &fds,
-  int& fd_max, const int primary_id)
+                          int& fd_max, const int primary_id)
 {
     fd_max = INT_MIN;
     int fd_temp;
@@ -354,8 +354,8 @@ void Replica::CheckAndDecrementWaitFor(vector<int>& waitfor, const int& s_fd)
  * function for performing replica related job
  */
 
- void Replica::ReplicaMode(const int primary_id)
- {
+void Replica::ReplicaMode(const int primary_id)
+{
     char buf[kMaxDataSize];
     int num_bytes;
 
@@ -472,6 +472,7 @@ void Replica::CheckAndDecrementWaitFor(vector<int>& waitfor, const int& s_fd)
                                     MergeDecisions(receivedAllDecisions);
                                     if (waitfor.empty()) {
                                         S->set_mode(RUNNING);
+                                        S->SendGoAheadToMaster();
                                         D(cout << "SR" << S->get_pid() << ": Recovered. My decisions are now " << allDecisionsToString(decisions_) << endl;)
                                     }
                                 }
@@ -504,11 +505,11 @@ void Replica::CheckAndDecrementWaitFor(vector<int>& waitfor, const int& s_fd)
 }
 
 void Replica::ResendProposals(const int primary_id) {
-    if(S->get_pid() != primary_id)
+    if (S->get_pid() != primary_id)
         return;
 
-    for(auto &p: proposals_) {
-        if(decisions_.find(p.first) == decisions_.end()) {
+    for (auto &p : proposals_) {
+        if (decisions_.find(p.first) == decisions_.end()) {
             Propose(p.second, primary_id);
         }
     }
@@ -595,14 +596,14 @@ void Replica::MergeDecisions(map<int, Proposal> receivedAllDecisions)
  * @param  _S pointer to server class object
  * @return    NULL
  */
- void* ReplicaEntry(void *_S) {
+void* ReplicaEntry(void *_S) {
     signal(SIGPIPE, SIG_IGN);
     Replica R((Server*)_S);
 
     pthread_t accept_connections_thread;
     CreateThread(AcceptConnectionsReplica, (void*)&R, accept_connections_thread);
 
-    while(1)
+    while (1)
     {
 
         // sleep for some time to make sure accept threads of commanders and scouts are running
@@ -629,31 +630,31 @@ void Replica::MergeDecisions(map<int, Proposal> receivedAllDecisions)
 
 
         for (int i = 0; i < R.S->get_pid(); i++)
-            {   if(R.get_replica_fd(i)!=-1) //if not already connected
+        {   if (R.get_replica_fd(i) != -1) //if not already connected
                 continue;
-                if (R.ConnectToReplica(i)) {
-                    D(cout << "SR" << R.S->get_pid() << ": Connected to replica of S"
-                      << i << endl;)
-                } else {
-                    D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to replica of S"
-                      << i << endl;)
-                    //return NULL; removed because replica may not be there sometimes
-                }
+            if (R.ConnectToReplica(i)) {
+                D(cout << "SR" << R.S->get_pid() << ": Connected to replica of S"
+                  << i << endl;)
+            } else {
+                D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to replica of S"
+                  << i << endl;)
+                //return NULL; removed because replica may not be there sometimes
             }
+        }
         // sleep for some time to make sure all connections are established
-            usleep(kGeneralSleep);
-            usleep(kGeneralSleep);
-            usleep(kGeneralSleep);
+        usleep(kGeneralSleep);
+        usleep(kGeneralSleep);
+        usleep(kGeneralSleep);
 
         // pthread_t receive_from_replicas_thread;
         // CreateThread(ReceiveMessagesFromReplicas, (void*)&R, receive_from_replicas_thread);
         // while(R.S->get_mode() != RUNNING)
         //     usleep(kRecoveryWaitSleep);
 
-            R.S->set_replica_ready(true);
-            R.ReplicaMode(primary_id);
-        }
-        void *status;
-        pthread_join(accept_connections_thread, &status);
-        return NULL;
+        R.S->set_replica_ready(true);
+        R.ReplicaMode(primary_id);
     }
+    void *status;
+    pthread_join(accept_connections_thread, &status);
+    return NULL;
+}

@@ -8,6 +8,7 @@
 #include "sstream"
 #include "cstring"
 #include "unistd.h"
+#include "fcntl.h"
 #include "spawn.h"
 #include "sys/types.h"
 #include "signal.h"
@@ -77,10 +78,12 @@ void Master::set_client_pid(const int client_id, const int pid) {
 
 void Master::set_server_fd(const int server_id, const int fd) {
     server_fd_[server_id] = fd;
+    SetCloseExecFlag(fd);
 }
 
 void Master::set_client_fd(const int client_id, const int fd) {
     client_fd_[client_id] = fd;
+    SetCloseExecFlag(fd);
 }
 
 void Master::set_primary_id(const int primary_id) {
@@ -90,12 +93,29 @@ void Master::set_primary_id(const int primary_id) {
 void Master::set_server_status(const int server_id, const Status s) {
     server_status_[server_id] = s;
 }
+
+void Master::SetCloseExecFlag(const int fd) {
+    if(fd == -1)
+        return;
+
+    int flags;
+
+    flags = fcntl(fd, F_GETFD);
+    if (flags == -1) {
+        D(cout << "M  : ERROR in setting CloseExec for " << fd << endl;)
+    }
+    flags |= FD_CLOEXEC;
+    if (fcntl(fd, F_SETFD, flags) == -1) {
+        D(cout << "M  : ERROR in setting CloseExec for " << fd << endl;)
+    }
+}
+
 /**
  * extracts chat message from the sendMessage command
  * @param command the sendMessage command given by user
  * @param message [out] extracted chat message
  */
- void Master::ExtractChatMessage(const string &command, string &message) {
+void Master::ExtractChatMessage(const string &command, string &message) {
     int n = command.size();
     int i = 0;
     int spaces_count = 0;
@@ -116,7 +136,7 @@ void Master::set_server_status(const int server_id, const Status s) {
  * @param chat_message body of chat message
  * @param message      [out] templated message which can be sent
  */
- void Master::ConstructChatMessage(const string &chat_message, string &message) {
+void Master::ConstructChatMessage(const string &chat_message, string &message) {
     message = kChat + kInternalDelim + chat_message + kMessageDelim;
 }
 
@@ -124,7 +144,7 @@ void Master::set_server_status(const int server_id, const Status s) {
  * reads ports-file and populates port related vectors/maps
  * @return true is ports-file was read successfully
  */
- bool Master::ReadPortsFile() {
+bool Master::ReadPortsFile() {
     ifstream fin;
     fin.exceptions ( ifstream::failbit | ifstream::badbit );
     try {
@@ -158,7 +178,7 @@ void Master::set_server_status(const int server_id, const Status s) {
 /**
  * reads test commands from stdin
  */
- void Master::ReadTest() {
+void Master::ReadTest() {
     string line;
     while (getline(std::cin, line)) {
         std::istringstream iss(line);
@@ -173,6 +193,8 @@ void Master::set_server_status(const int server_id, const Status s) {
                 return;
             if (!SpawnClients(num_clients_))
                 return;
+            // if (!ConnectToServersAndClients())
+            //     return;
             usleep(kGeneralSleep);
             usleep(kGeneralSleep);
         }
@@ -193,11 +215,16 @@ void Master::set_server_status(const int server_id, const Status s) {
             CrashServer(server_id);
             if (server_id == get_primary_id()) {
                 NewPrimaryElection();
-                WaitForGoAhead();
+                WaitForGoAhead(get_primary_id());
             }
         }
         if (keyword == kRestartServer) {
+            int server_id;
+            iss >> server_id;
+            if (!RestartServer(server_id))
+                return;
 
+            WaitForGoAhead(server_id);
         }
         if (keyword == kAllClear) {
             usleep(kGeneralSleep);
@@ -207,9 +234,6 @@ void Master::set_server_status(const int server_id, const Status s) {
             SendAllClearToServers(kAllClear); //sends to primary server
             WaitForAllClearDone();
             SendAllClearToServers(kAllClearRemove); //sends to primary server
-            // cout<<"System is now in idle state. Enter any key to proceed"<<endl;
-            // string s;
-            // cin>>s;
         }
         if (keyword == kTimeBombLeader) {
             int num_messages;
@@ -234,15 +258,15 @@ void Master::ConstructAllClearMessage(string &message, const string& type) {
     message = type + kInternalDelim + kMessageDelim;
 }
 
-void Master::WaitForGoAhead() {
+void Master::WaitForGoAhead(const int server_id) {
     char buf[kMaxDataSize];
     int num_bytes;
-    if ((num_bytes = recv(get_server_fd(get_primary_id()), buf, kMaxDataSize - 1, 0)) == -1) {
-        D(cout << "M  : ERROR in receiving GOAHEAD from primary S" << get_primary_id() << endl;)
+    if ((num_bytes = recv(get_server_fd(server_id), buf, kMaxDataSize - 1, 0)) == -1) {
+        D(cout << "M  : ERROR in receiving GOAHEAD from primary S" << server_id << endl;)
     }
     else if (num_bytes == 0)
     {   //connection closed
-        D(cout << "M  : ERROR Connection closed by primary S" << get_primary_id() << endl;)
+        D(cout << "M  : ERROR Connection closed by primary S" << server_id << endl;)
     }
     else
     {
@@ -253,16 +277,16 @@ void Master::WaitForGoAhead() {
             std::vector<string> token = split(string(msg), kInternalDelim[0]);
             if (token[0] == kGoAhead)
             {
-                D(cout << "M  : GOAHEAD received from primary S" << get_primary_id() << endl;)
+                D(cout << "M  : GOAHEAD received from S" << server_id << endl;)
             }
         }
     }
 }
 int Master::GetServerIdFromFd(int fd)
 {
-    for(int i=0; i<get_num_servers(); i++)
+    for (int i = 0; i < get_num_servers(); i++)
     {
-        if(get_server_fd(i)==fd)
+        if (get_server_fd(i) == fd)
         {
             return i;
         }
@@ -301,7 +325,7 @@ void Master::WaitForAllClearDone()
             D(cout << "M  : ERROR: Unexpected timeout in select() while waiting for all clear" << endl;)
         } else {
             for (int i = 0; i < fds.size(); i++) {
-                if(get_server_status(GetServerIdFromFd(fds[i])) == DEAD)
+                if (get_server_status(GetServerIdFromFd(fds[i])) == DEAD)
                     continue;
 
 
@@ -312,14 +336,14 @@ void Master::WaitForAllClearDone()
                         CloseAndUnSetServer(serv_id);
                         D(cout << "M: ERROR in receiving all clear done from server S" << serv_id << endl;)
                         waitfor--;
-                    } 
-                    else if (num_bytes == 0) 
-                    {     //connection closed
+                    }
+                    else if (num_bytes == 0)
+                    {   //connection closed
                         CloseAndUnSetServer(serv_id);
                         waitfor--;
                         // D(cout << "M: ERROR Connection closed by server S" << i << endl;)
-                    } 
-                    else 
+                    }
+                    else
                     {
                         buf[num_bytes] = '\0';
                         std::vector<string> message = split(string(buf), kMessageDelim[0]);
@@ -377,7 +401,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
  * on receiving suicide from primary, it kills primary and elects new primary
  * @param num_messages primary's alloted quota of messages
  */
- void Master::TimeBombLeader(const int num_messages) {
+void Master::TimeBombLeader(const int num_messages) {
     int primary_id = get_primary_id();
     string msg = kTimeBomb + to_string(num_messages) + kMessageDelim;
     SendMessageToServer(primary_id, msg);
@@ -407,7 +431,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
  * performs all tasks related to new primary election
  * and informing servers and clients about the new primary
  */
- void Master::NewPrimaryElection() {
+void Master::NewPrimaryElection() {
     ElectNewPrimary();
     InformServersAboutNewPrimary();
     usleep(kGeneralSleep);
@@ -418,7 +442,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
 /**
  * elects a new primary among the set of running servers using round robin
  */
- void Master::ElectNewPrimary() {
+void Master::ElectNewPrimary() {
     int curr_primary = get_primary_id();
     int i = (curr_primary + 1) % num_servers_;
     while (true) {
@@ -434,7 +458,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
 /**
  * sends id of new primary to each client
  */
- void Master::InformClientsAboutNewPrimary() {
+void Master::InformClientsAboutNewPrimary() {
     string msg = kNewPrimary + kInternalDelim + to_string(get_primary_id()) + kMessageDelim;
     for (int i = 0; i < num_clients_; ++i) {
         SendMessageToClient(i, msg);
@@ -444,7 +468,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
 /**
  * sends id of new primary to each server
  */
- void Master::InformServersAboutNewPrimary() {
+void Master::InformServersAboutNewPrimary() {
     string msg = kNewPrimary + kInternalDelim + to_string(get_primary_id()) + kMessageDelim;
     for (int i = 0; i < num_servers_; ++i) {
         if (server_status_[i] != DEAD) {
@@ -458,7 +482,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
 //     vector<int> local = server_fd_;
 //     for(int i=0; i<local.size(); i++)
 //     {
-//         if(local[i]==fd) return i;    
+//         if(local[i]==fd) return i;
 //     }
 //     return -1;
 // }
@@ -467,7 +491,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
  * @param client_id id of client from which chatlog is to be received
  * @param chat_log  [out] chatlog received in concatenated string form
  */
- void Master::ReceiveChatLogFromClient(const int client_id, string & chat_log) {
+void Master::ReceiveChatLogFromClient(const int client_id, string & chat_log) {
     char buf[kMaxDataSize];
     int num_bytes;
     num_bytes = recv(get_client_fd(client_id), buf, kMaxDataSize - 1, 0);
@@ -487,7 +511,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
  * prints chat log received from a client in the expected format
  * @param chat_log chat log in concatenated string format
  */
- void Master::PrintChatLog(const int client_id, const string & chat_log) {
+void Master::PrintChatLog(const int client_id, const string & chat_log) {
     std::vector<string> chat = split(chat_log, kMessageDelim[0]);
     for (auto &c : chat) {
         std::vector<string> token = split(c, kInternalDelim[0]);
@@ -501,7 +525,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
 /**
  * initialize data members and resize vectors
  */
- void Master::Initialize() {
+void Master::Initialize() {
     set_primary_id(0);
     server_pid_.resize(num_servers_, -1);
     client_pid_.resize(num_clients_, -1);
@@ -518,52 +542,37 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
 }
 
 /**
+ * restarts server by spawing it again and connecting to it
+ * @param  server_id id of server to be restarted
+ * @return           true if server was restarted and connected to successfully
+ */
+bool Master::RestartServer(const int server_id) {
+    if (!SpawnOneServer(server_id, RECOVER))
+        return false;
+
+    // sleep for some time to make sure accept threads of the server are running
+    usleep(kGeneralSleep);
+    if (ConnectToServer(server_id)) {
+        D(cout << "M  : Connected to server S" << server_id << endl;)
+    } else {
+        D(cout << "M  : ERROR: Cannot connect to server S" << server_id << endl;)
+        return false;
+    }
+    return true;
+}
+
+/**
  * spawns n servers and connects to them
  * @param n number of servers to be spawned
  * @return true if n servers were spawned and connected to successfully
  */
- bool Master::SpawnServers(const int n) {
-    pid_t pid;
-    int status;
+bool Master::SpawnServers(const int n) {
     for (int i = 0; i < n; ++i) {
-        char server_id_arg[10];
-        char num_servers_arg[10];
-        char num_clients_arg[10];
-        char mode_arg[10];
-        sprintf(server_id_arg, "%d", i);
-        sprintf(num_servers_arg, "%d", num_servers_);
-        sprintf(num_clients_arg, "%d", num_clients_);
-
-        //for testing
-        // if(i==1)
-        //     sprintf(mode_arg, "%d", 2);
-        // else
-        sprintf(mode_arg, "%d", 1);
-
-        char *argv[] = {(char*)kServerExecutable.c_str(),
-            server_id_arg,
-            num_servers_arg,
-            num_clients_arg,
-            mode_arg,
-            NULL
-        };
-        status = posix_spawn(&pid,
-         (char*)kServerExecutable.c_str(),
-         NULL,
-         NULL,
-         argv,
-         environ);
-        if (status == 0) {
-            D(cout << "M  : Spawed server S" << i << endl;)
-            set_server_pid(i, pid);
-        } else {
-            D(cout << "M  : ERROR: Cannot spawn server S"
-              << i << " - " << strerror(status) << endl);
+        if (!SpawnOneServer(i, RUNNING))
             return false;
-        }
     }
 
-    // sleep for some time to make sure accept threads of servers are running
+        // sleep for some time to make sure accept threads of servers are running
     usleep(kGeneralSleep);
     for (int i = 0; i < n; ++i) {
         if (ConnectToServer(i)) {
@@ -577,11 +586,56 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
 }
 
 /**
+ * spawns 1 servers and connects to them
+ * @param server_id id of server to be spawned
+ * @return true if server wes spawned successfully
+ */
+bool Master::SpawnOneServer(const int server_id, Status mode) {
+    pid_t pid;
+    int status;
+    char server_id_arg[10];
+    char num_servers_arg[10];
+    char num_clients_arg[10];
+    char mode_arg[10];
+    sprintf(server_id_arg, "%d", server_id);
+    sprintf(num_servers_arg, "%d", num_servers_);
+    sprintf(num_clients_arg, "%d", num_clients_);
+
+    if (mode == RECOVER)
+        sprintf(mode_arg, "%d", 2);
+    else
+        sprintf(mode_arg, "%d", 1);
+
+    char *argv[] = {(char*)kServerExecutable.c_str(),
+                    server_id_arg,
+                    num_servers_arg,
+                    num_clients_arg,
+                    mode_arg,
+                    NULL
+                   };
+    status = posix_spawn(&pid,
+                         (char*)kServerExecutable.c_str(),
+                         NULL,
+                         NULL,
+                         argv,
+                         environ);
+    if (status == 0) {
+        D(cout << "M  : Spawed server S" << server_id << endl;)
+        set_server_pid(server_id, pid);
+    } else {
+        D(cout << "M  : ERROR: Cannot spawn server S"
+          << server_id << " - " << strerror(status) << endl);
+        return false;
+    }
+    return true;
+}
+
+/**
  * spawns n clients and connects to them
  * @param n number of clients to be spawned
  * @return true if n client were spawned and connected to successfully
  */
- bool Master::SpawnClients(const int n) {
+bool Master::SpawnClients(const int n) {
     pid_t pid;
     int status;
     for (int i = 0; i < n; ++i) {
@@ -592,17 +646,17 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
         sprintf(num_servers_arg, "%d", num_servers_);
         sprintf(num_clients_arg, "%d", num_clients_);
         char *argv[] = {(char*)kClientExecutable.c_str(),
-            server_id_arg,
-            num_servers_arg,
-            num_clients_arg,
-            NULL
-        };
+                        server_id_arg,
+                        num_servers_arg,
+                        num_clients_arg,
+                        NULL
+                       };
         status = posix_spawn(&pid,
-            (char*)kClientExecutable.c_str(),
-            NULL,
-            NULL,
-            argv,
-            environ);
+                             (char*)kClientExecutable.c_str(),
+                             NULL,
+                             NULL,
+                             argv,
+                             environ);
         if (status == 0) {
             D(cout << "M  : Spawed client C" << i << endl;)
             set_client_pid(i, pid);
@@ -629,12 +683,13 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
  * kills the specified server. Set its pid and fd to -1
  * @param server_id id of server to be killed
  */
- void Master::CrashServer(const int server_id)
- {
+void Master::CrashServer(const int server_id)
+{
     int pid = get_server_pid(server_id);
     if (pid != -1) {
         // TODO: Think whether SIGKILL or SIGTERM
         // TODO: If using SIGTERM, consider signal handling in server.cpp
+        close(get_server_fd(server_id));
         kill(pid, SIGKILL);
         set_server_pid(server_id, -1);
         set_server_fd(server_id, -1);
@@ -647,7 +702,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
  * kills the specified client. Set its pid and fd to -1
  * @param client_id id of client to be killed
  */
- void Master::CrashClient(const int client_id) {
+void Master::CrashClient(const int client_id) {
     int pid = get_client_pid(client_id);
     if (pid != -1) {
         // TODO: Think whether SIGKILL or SIGTERM
@@ -661,7 +716,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
 /**
  * kills all running servers
  */
- void Master::KillAllServers() {
+void Master::KillAllServers() {
     for (int i = 0; i < num_servers_; ++i) {
         CrashServer(i);
     }
@@ -670,7 +725,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
 /**
  * kills all running clients
  */
- void Master::KillAllClients() {
+void Master::KillAllClients() {
     for (int i = 0; i < num_clients_; ++i) {
         CrashClient(i);
     }
@@ -681,7 +736,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
  * @param client_id id of client to which message needs to be sent
  * @param message   message to be sent
  */
- void Master::SendMessageToClient(const int client_id, const string & message) {
+void Master::SendMessageToClient(const int client_id, const string & message) {
     if (send(get_client_fd(client_id), message.c_str(), message.size(), 0) == -1) {
         D(cout << "M  : ERROR: Cannot send message to client C" << client_id << endl;)
     } else {
@@ -694,7 +749,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
  * @param server_id id of server to which message needs to be sent
  * @param message   message to be sent
  */
- void Master::SendMessageToServer(const int server_id, const string & message) {
+void Master::SendMessageToServer(const int server_id, const string & message) {
     if (send(get_server_fd(server_id), message.c_str(), message.size(), 0) == -1) {
         D(cout << "M  : ERROR: Cannot send message to server S" << server_id << endl;)
     } else {
@@ -709,8 +764,8 @@ int main() {
     M.ReadTest();
 
     // while(1);
-    usleep(18000*1000);
-    cout<<"Master crashing all"<<endl;
+    usleep(18000 * 1000);
+    cout << "Master crashing all" << endl;
     M.KillAllServers();
     M.KillAllClients();
     return 0;

@@ -138,6 +138,7 @@ void* AcceptConnections(void* _C) {
  * @return  true if connection was successfull or already connected
  */
 bool Client::ConnectToPrimary() {
+    
     int primary_id = get_primary_id();
     int sockfd;  // listen on sock_fd, new connection on new_fd
     struct addrinfo hints, *clientinfo, *l;
