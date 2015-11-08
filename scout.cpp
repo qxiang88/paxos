@@ -32,7 +32,7 @@ Scout::Scout(Server* _S) {
     int num_servers = S->get_num_servers();
 
     leader_fd_.resize(num_servers, -1);
-    replica_fd_.resize(num_servers, -1);
+    // replica_fd_.resize(num_servers, -1);
     acceptor_fd_.resize(num_servers, -1);
 }
 
@@ -40,9 +40,9 @@ int Scout::get_leader_fd(const int server_id) {
     return leader_fd_[server_id];
 }
 
-int Scout::get_replica_fd(const int server_id) {
-    return replica_fd_[server_id];
-}
+// int Scout::get_replica_fd(const int server_id) {
+//     return replica_fd_[server_id];
+// }
 
 int Scout::get_acceptor_fd(const int server_id) {
     return acceptor_fd_[server_id];
@@ -52,9 +52,9 @@ void Scout::set_leader_fd(const int server_id, const int fd) {
     leader_fd_[server_id] = fd;
 }
 
-void Scout::set_replica_fd(const int server_id, const int fd) {
-    replica_fd_[server_id] = fd;
-}
+// void Scout::set_replica_fd(const int server_id, const int fd) {
+//     replica_fd_[server_id] = fd;
+// }
 
 void Scout::set_acceptor_fd(const int server_id, const int fd) {
     acceptor_fd_[server_id] = fd;

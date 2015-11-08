@@ -28,11 +28,11 @@ public:
     int CountAcceptorsAlive();
 
     int get_leader_fd(const int server_id);
-    int get_replica_fd(const int server_id);
+    // int get_replica_fd(const int server_id);
     int get_acceptor_fd(const int server_id);
 
     void set_leader_fd(const int server_id, const int fd);
-    void set_replica_fd(const int server_id, const int fd);
+    // void set_replica_fd(const int server_id, const int fd);
     void set_acceptor_fd(const int server_id, const int fd);
 
     Scout(Server *_S);
@@ -40,7 +40,7 @@ public:
     Server *S;
 private:
     std::vector<int> leader_fd_;
-    std::vector<int> replica_fd_;
+    // std::vector<int> replica_fd_;
     std::vector<int> acceptor_fd_;
 };
 

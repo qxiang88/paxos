@@ -17,7 +17,7 @@ void* ReceiveMessagesFromReplicas(void* _R );
 class Replica {
 public:
     bool ConnectToCommander(const int server_id);
-    bool ConnectToScout(const int server_id);
+    // bool ConnectToScout(const int server_id);
     bool ConnectToReplica(const int server_id);
     bool ConnectToLeader(const int server_id);
     void Propose(const Proposal &p, const int primary_id);
@@ -44,7 +44,7 @@ public:
 
     int get_slot_num();
     int get_commander_fd(const int server_id);
-    int get_scout_fd(const int server_id);
+    // int get_scout_fd(const int server_id);
     int get_leader_fd(const int server_id);
     int get_client_chat_fd(const int client_id);
     int get_replica_fd(const int server_id);
@@ -52,7 +52,7 @@ public:
 
     void set_slot_num(const int slot_num);
     void set_commander_fd(const int server_id, const int fd);
-    void set_scout_fd(const int server_id, const int fd);
+    // void set_scout_fd(const int server_id, const int fd);
     void set_leader_fd(const int server_id, const int fd);
     void set_client_chat_fd(const int client_id, const int fd);
     void set_replica_fd(const int client_id, const int fd);
@@ -69,7 +69,7 @@ private:
     int slot_num_;
 
     std::vector<int> commander_fd_;
-    std::vector<int> scout_fd_;
+    // std::vector<int> scout_fd_;
     std::vector<int> leader_fd_;
     std::vector<int> client_chat_fd_;
     std::vector<int> replica_fd_;

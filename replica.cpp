@@ -43,7 +43,7 @@ Replica::Replica(Server* _S) {
     int num_clients = S->get_num_clients();
 
     commander_fd_.resize(num_servers, -1);
-    scout_fd_.resize(num_servers, -1);
+    // scout_fd_.resize(num_servers, -1);
     leader_fd_.resize(num_servers, -1);
     client_chat_fd_.resize(num_clients, -1);
     replica_fd_.resize(num_servers, -1);
@@ -58,9 +58,9 @@ int Replica::get_commander_fd(const int server_id) {
     return commander_fd_[server_id];
 }
 
-int Replica::get_scout_fd(const int server_id) {
-    return scout_fd_[server_id];
-}
+// int Replica::get_scout_fd(const int server_id) {
+//     return scout_fd_[server_id];
+// }
 
 int Replica::get_leader_fd(const int server_id) {
     return leader_fd_[server_id];
@@ -96,9 +96,9 @@ void Replica::set_commander_fd(const int server_id, const int fd) {
     commander_fd_[server_id] = fd;
 }
 
-void Replica::set_scout_fd(const int server_id, const int fd) {
-    scout_fd_[server_id] = fd;
-}
+// void Replica::set_scout_fd(const int server_id, const int fd) {
+//     scout_fd_[server_id] = fd;
+// }
 
 void Replica::set_leader_fd(const int server_id, const int fd) {
     leader_fd_[server_id] = fd;
@@ -328,6 +328,19 @@ void Replica::ResetFD(const int fd, const int primary_id) {
         if (fd == get_replica_fd(i)) {
             set_replica_fd(i, -1);
             close(fd);
+
+            if (S->get_pid() != primary_id) 
+                continue;
+
+            Scout* scout_obj = S->get_scout_object();
+            close(scout_obj->get_acceptor_fd(i));
+            scout_obj->set_acceptor_fd(i, -1);
+
+            Commander* C = new Commander(S);
+            close(C->get_replica_fd(i));
+            C->set_replica_fd(i, -1);
+            delete C;
+            
             return;
         }
     }
@@ -379,7 +392,7 @@ void Replica::ReplicaMode(const int primary_id)
 
         if (primary_id != S->get_primary_id()) {   // new primary elected
             set_commander_fd(primary_id, -1);
-            set_scout_fd(primary_id, -1);
+            // set_scout_fd(primary_id, -1);
             set_leader_fd(primary_id, -1);
             return;
         }
@@ -634,14 +647,14 @@ void* ReplicaEntry(void *_S) {
             return NULL;
         }
 
-        if (R.ConnectToScout(primary_id)) {
-            D(cout << "SR" << R.S->get_pid() << ": Connected to scout of S"
-              << primary_id << endl;)
-        } else {
-            D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to scout of S"
-              << primary_id << endl;)
-            return NULL;
-        }
+        // if (R.ConnectToScout(primary_id)) {
+        //     D(cout << "SR" << R.S->get_pid() << ": Connected to scout of S"
+        //       << primary_id << endl;)
+        // } else {
+        //     D(cout << "SR" << R.S->get_pid() << ": ERROR in connecting to scout of S"
+        //       << primary_id << endl;)
+        //     return NULL;
+        // }
 
         int upper_bound;
         if (R.S->get_mode() == RECOVER)

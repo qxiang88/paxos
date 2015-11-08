@@ -109,17 +109,16 @@ void* AcceptConnectionsScout(void* _SC) {
         if (process_id != -1) { //incoming connection from a leader
             SC->set_leader_fd(process_id, new_fd);
         } else {
-            process_id = SC->S->IsReplicaPort(incoming_port);
-            if (process_id != -1) { //incoming connection from a replica
-                SC->set_replica_fd(process_id, new_fd);
+            // process_id = SC->S->IsReplicaPort(incoming_port);
+            // if (process_id != -1) { //incoming connection from a replica
+            //     SC->set_replica_fd(process_id, new_fd);
+            // } else {
+            process_id = SC->S->IsAcceptorPort(incoming_port);
+            if (process_id != -1) { //incoming connection from an acceptor
+                SC->set_acceptor_fd(process_id, new_fd);
             } else {
-                process_id = SC->S->IsAcceptorPort(incoming_port);
-                if (process_id != -1) { //incoming connection from an acceptor
-                    SC->set_acceptor_fd(process_id, new_fd);
-                } else {
-                    D(cout << "SS" << SC->S->get_pid() << ": ERROR: Unexpected connect request from port "
-                      << incoming_port << endl;)
-                }
+                D(cout << "SS" << SC->S->get_pid() << ": ERROR: Unexpected connect request from port "
+                  << incoming_port << endl;)
             }
         }
     }
