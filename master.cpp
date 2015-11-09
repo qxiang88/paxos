@@ -531,7 +531,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
     std::vector<string> chat = split(chat_log, kInternalSetDelim[0]);
     for (auto &c : chat) {
         std::vector<string> token = split(c, kInternalStructDelim[0]);
-        for (int i = 1; (i + 2) < token.size(); i = i + 3) {
+        for (int i = 0; (i + 2) < token.size(); i = i + 3) {
             fout_[client_id] << token[i] << " " << token[i + 1] << ": " << token[i + 2] << endl;
         }
     }
@@ -639,11 +639,11 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
         NULL
     };
     status = posix_spawn(&pid,
-       (char*)kServerExecutable.c_str(),
-       NULL,
-       NULL,
-       argv,
-       environ);
+     (char*)kServerExecutable.c_str(),
+     NULL,
+     NULL,
+     argv,
+     environ);
     if (status == 0) {
         D(cout << "M  : Spawned server S" << server_id << endl;)
         set_server_pid(server_id, pid);
@@ -677,11 +677,11 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
             NULL
         };
         status = posix_spawn(&pid,
-           (char*)kClientExecutable.c_str(),
-           NULL,
-           NULL,
-           argv,
-           environ);
+         (char*)kClientExecutable.c_str(),
+         NULL,
+         NULL,
+         argv,
+         environ);
         if (status == 0) {
             D(cout << "M  : Spawned client C" << i << endl;)
             set_client_pid(i, pid);
