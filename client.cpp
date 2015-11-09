@@ -188,8 +188,8 @@ int Client::set_primary_id(const int primary_id) {
  * @param body         chat message body
  */
  void Client::AddToFinalChatLog(const string &sequence_num,
-     const string &sender_index,
-     const string &body) {
+   const string &sender_index,
+   const string &body) {
     int seq_num = stoi(sequence_num);
 
     pthread_mutex_lock(&final_chat_log_lock);
@@ -214,8 +214,7 @@ int Client::set_primary_id(const int primary_id) {
     for (auto const &c : final_chat_log_) {
         msg += to_string(i) + kInternalStructDelim
         + c.second.sender_index + kInternalStructDelim
-        + c.second.body + kInternalStructDelim;
-
+        + c.second.body + kInternalSetDelim;
         i++;
     }
     msg+=kMessageDelim;
@@ -229,7 +228,7 @@ int Client::set_primary_id(const int primary_id) {
     string chat_log_message;
     ConstructChatLogMessage(chat_log_message);
     if (send(get_master_fd(), chat_log_message.c_str(),
-       chat_log_message.size(), 0) == -1) {
+     chat_log_message.size(), 0) == -1) {
         D(cout << "C" << get_pid() << " : ERROR: Cannot send ChatLog M" << endl;)
 } else {
     D(cout << "C" << get_pid() << " : ChatLog sent to M" << endl;)
@@ -351,7 +350,7 @@ int Client::set_primary_id(const int primary_id) {
                     // proposal_token[0] = (client id) id of original sender of chat message
                     // proposal_token[1] = (chat id) wrt to original sender of chat message
                     // proposal_token[2] = (msg) chat message body
-                    C->AddToFinalChatLog(token[1], proposal_token[1], proposal_token[2]);
+                    C->AddToFinalChatLog(token[1], proposal_token[0], proposal_token[2]);
                     if (stoi(proposal_token[0]) == C->get_pid())
                         C->AddToDecidedChatIDs(stoi(proposal_token[1]));
                 } else {
