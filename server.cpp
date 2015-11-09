@@ -21,7 +21,7 @@ pthread_mutex_t acceptor_ready_lock;
 pthread_mutex_t all_clear_lock;
 pthread_mutex_t message_quota_lock;
 
-#define DEBUG
+// #define DEBUG
 
 #ifdef DEBUG
 #  define D(x) x

@@ -18,7 +18,7 @@
 #include "pthread.h"
 using namespace std;
 
-#define DEBUG
+// #define DEBUG
 
 #ifdef DEBUG
 #  define D(x) x
@@ -521,8 +521,9 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
         {
             std::vector<string> token = split(m, kInternalDelim[0]);
             
-            if(token.size()<2)
+            if(token.size()<2){
                 D(cout<<"M  : Received chatlog from "<<client_id<<" is empty"<<endl;)
+            }
             else
                 chat_log = token[1];
         }
@@ -538,14 +539,10 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
     std::vector<string> chat = split(chat_log, kInternalSetDelim[0]);
     for (auto &c : chat) {
         std::vector<string> token = split(c, kInternalStructDelim[0]);
-        fout_[client_id]<<token[0]<<" "<<token[1]<<": "<<token[2]<<endl;
-        
-
-        // for (int i = 0; (i + 2) < token.size(); i = i + 3) {
-        //     fout_[client_id] << token[i] << " " << token[i + 1] << ": " << token[i + 2] << endl;
-        // }
+        // fout_[client_id]<<token[0]<<" "<<token[1]<<": "<<token[2]<<endl;
+        cout << token[0] << " " << token[1] << ": " << token[2] << endl;
     }
-    fout_[client_id] << "-------------" << endl;
+    // fout_[client_id] << "-------------" << endl;
 }
 
 /**

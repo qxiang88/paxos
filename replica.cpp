@@ -17,7 +17,7 @@ using namespace std;
 typedef pair<int, Proposal> SPtuple;
 pthread_mutex_t decisions_lock;
 
-#define DEBUG
+// #define DEBUG
 
 #ifdef DEBUG
 #  define D(x) x
