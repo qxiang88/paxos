@@ -3,6 +3,7 @@ sendMessage 0 first
 allClear
 timeBombLeader 2
 sendMessage 0 second
+sendMessage 1 third
 allClear
 printChatLog 0
 printChatLog 1

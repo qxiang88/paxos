@@ -86,7 +86,7 @@ int Client::set_primary_id(const int primary_id) {
     ifstream fin;
     fin.exceptions ( ifstream::failbit | ifstream::badbit );
     try {
-        fin.open((kPortsFile+to_string(num_clients_)).c_str());
+        fin.open(kPortsFile.c_str());
         fin >> master_port_;
 
         int port;
@@ -188,8 +188,8 @@ int Client::set_primary_id(const int primary_id) {
  * @param body         chat message body
  */
  void Client::AddToFinalChatLog(const string &sequence_num,
-   const string &sender_index,
-   const string &body) {
+     const string &sender_index,
+     const string &body) {
     int seq_num = stoi(sequence_num);
 
     pthread_mutex_lock(&final_chat_log_lock);
@@ -228,7 +228,7 @@ int Client::set_primary_id(const int primary_id) {
     string chat_log_message;
     ConstructChatLogMessage(chat_log_message);
     if (send(get_master_fd(), chat_log_message.c_str(),
-     chat_log_message.size(), 0) == -1) {
+       chat_log_message.size(), 0) == -1) {
         D(cout << "C" << get_pid() << " : ERROR: Cannot send ChatLog M" << endl;)
 } else {
     D(cout << "C" << get_pid() << " : ChatLog sent to M" << endl;)

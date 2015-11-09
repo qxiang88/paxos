@@ -371,7 +371,8 @@ void Leader::SendReplicasAllDecisions()
             //means all done. just waiting for all clear to be lifted
             usleep(kAllClearSleep);
         }
-        while ((commanders_.empty()) && (S->get_all_clear(kLeaderRole) == kAllClearSet) && !scout_active)
+        // && !scout_active)
+        while ((commanders_.empty()) && (S->get_all_clear(kLeaderRole) == kAllClearSet))
         {
             SendReplicasAllDecisions();
             S->set_all_clear(kLeaderRole, kAllClearDone);

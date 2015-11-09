@@ -288,7 +288,7 @@ void Server::set_message_quota(const int num_messages) {
     ifstream fin;
     fin.exceptions ( ifstream::failbit | ifstream::badbit );
     try {
-        fin.open((kPortsFile+to_string(get_num_servers())).c_str());
+        fin.open(kPortsFile.c_str());
         fin >> master_port_;
         int port;
         for (int i = 0; i < num_clients_; i++) {
