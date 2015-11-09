@@ -209,12 +209,12 @@ int Client::set_primary_id(const int primary_id) {
  void Client::ConstructChatLogMessage(string &msg) {
     pthread_mutex_lock(&final_chat_log_lock);
 
-    msg = kChatLog;
+    msg = kChatLog+kInternalDelim;
     int i = 0;
     for (auto const &c : final_chat_log_) {
-        msg += to_string(i) + kInternalDelim
-        + c.second.sender_index + kInternalDelim
-        + c.second.body + kInternalSetDelim;
+        msg += to_string(i) + kInternalStructDelim
+        + c.second.sender_index + kInternalStructDelim
+        + c.second.body + kInternalStructDelim;
 
         i++;
     }
