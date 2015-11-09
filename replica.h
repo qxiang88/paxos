@@ -34,7 +34,6 @@ public:
 
     void CreateFdSet(fd_set& fromset, vector<int> &fds, int& fd_max, const int primary_id);
     void RecoverDecisions();
-    void GetReplicaFdSet(fd_set& server_fd_set, vector<int>&, int& fd_max);
     vector<int> SendDecisionsRequest();
     void SendDecisionsResponse(int, int);
     void MergeDecisions(map<int, Proposal>);

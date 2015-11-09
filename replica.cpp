@@ -259,6 +259,7 @@ void Replica::CreateFdSet(fd_set& fromset, vector<int> &fds,
                           int& fd_max, const int primary_id)
 {
     fd_max = INT_MIN;
+    char buf;
     int fd_temp;
     FD_ZERO(&fromset);
     fds.clear();
@@ -268,9 +269,15 @@ void Replica::CreateFdSet(fd_set& fromset, vector<int> &fds,
         if (fd_temp == -1) {
             continue;
         }
-        fd_max = max(fd_max, fd_temp);
-        fds.push_back(fd_temp);
-        FD_SET(fd_temp, &fromset);
+        int rv = recv(fd_temp, &buf, 1, MSG_DONTWAIT | MSG_PEEK);
+        if (rv == 0) {
+            close(fd_temp);
+            set_client_chat_fd(i, -1);
+        } else {
+            FD_SET(fd_temp, &fromset);
+            fd_max = max(fd_max, fd_temp);
+            fds.push_back(fd_temp);
+        }
     }
 
     for (int i = 0; i < S->get_num_servers(); i++)
@@ -278,16 +285,29 @@ void Replica::CreateFdSet(fd_set& fromset, vector<int> &fds,
         fd_temp = get_commander_fd(i);
         if (fd_temp == -1)
             continue;
-        fd_max = max(fd_max, fd_temp);
-        fds.push_back(fd_temp);
-        FD_SET(fd_temp, &fromset);
+        int rv = recv(fd_temp, &buf, 1, MSG_DONTWAIT | MSG_PEEK);
+        if (rv == 0) {
+            close(fd_temp);
+            set_commander_fd(i, -1);
+        } else {
+            fd_max = max(fd_max, fd_temp);
+            fds.push_back(fd_temp);
+            FD_SET(fd_temp, &fromset);
+        }
+
     }
 
     fd_temp = get_leader_fd(primary_id);
     if (fd_temp != -1) {
-        fd_max = max(fd_max, fd_temp);
-        fds.push_back(fd_temp);
-        FD_SET(fd_temp, &fromset);
+        int rv = recv(fd_temp, &buf, 1, MSG_DONTWAIT | MSG_PEEK);
+        if (rv == 0) {
+            close(fd_temp);
+            set_leader_fd(primary_id, -1);
+        } else {
+            fd_max = max(fd_max, fd_temp);
+            fds.push_back(fd_temp);
+            FD_SET(fd_temp, &fromset);
+        }
     }
 
     for (int i = 0; i < S->get_num_servers(); i++)
@@ -295,9 +315,16 @@ void Replica::CreateFdSet(fd_set& fromset, vector<int> &fds,
         fd_temp = get_replica_fd(i);
         if (fd_temp == -1)
             continue;
-        fd_max = max(fd_max, fd_temp);
-        fds.push_back(fd_temp);
-        FD_SET(fd_temp, &fromset);
+        int rv = recv(fd_temp, &buf, 1, MSG_DONTWAIT | MSG_PEEK);
+        if (rv == 0) {
+            close(fd_temp);
+            set_replica_fd(i, -1);
+        } else {
+            fd_max = max(fd_max, fd_temp);
+            fds.push_back(fd_temp);
+            FD_SET(fd_temp, &fromset);
+        }
+
     }
 }
 
@@ -329,7 +356,7 @@ void Replica::ResetFD(const int fd, const int primary_id) {
             set_replica_fd(i, -1);
             close(fd);
 
-            if (S->get_pid() != primary_id) 
+            if (S->get_pid() != primary_id)
                 continue;
 
             Scout* scout_obj = S->get_scout_object();
@@ -340,7 +367,7 @@ void Replica::ResetFD(const int fd, const int primary_id) {
             close(C->get_replica_fd(i));
             C->set_replica_fd(i, -1);
             delete C;
-            
+
             return;
         }
     }
@@ -542,26 +569,6 @@ void Replica::ResendProposals(const int primary_id) {
         }
     }
 }
-
-void Replica::GetReplicaFdSet(fd_set& replica_fd_set, vector<int>& fds, int& fd_max)
-{
-    int fd_temp;
-    fd_max = INT_MIN;
-    fds.clear();
-    FD_ZERO(&replica_fd_set);
-    for (int i = 0; i < S->get_num_servers(); i++)
-    {
-        fd_temp = get_replica_fd(i);
-        if (fd_temp != -1)
-        {
-            // cout<<S->get_pid()<<" adding "<<fd_temp<<endl;
-            FD_SET(fd_temp, &replica_fd_set);
-            fd_max = max(fd_max, fd_temp);
-            fds.push_back(fd_temp);
-        }
-    }
-}
-
 
 vector<int> Replica::SendDecisionsRequest()
 {

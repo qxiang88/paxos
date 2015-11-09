@@ -88,14 +88,20 @@ int Scout::SendToServers(const string& type, const string& msg)
 
 void Scout::GetAcceptorFdSet(fd_set& acceptor_set, vector<int>& fds, int& fd_max)
 {
+    char buf;
     fd_max = INT_MIN;
     int fd_temp;
     FD_ZERO(&acceptor_set);
     fds.clear();
     for (int i = 0; i < S->get_num_servers(); i++) {
         fd_temp = get_acceptor_fd(i);
-        if (fd_temp != -1)
-        {
+        if (fd_temp == -1) continue;
+
+        int rv = recv(fd_temp, &buf, 1, MSG_DONTWAIT | MSG_PEEK);
+        if (rv == 0) {
+            close(fd_temp);
+            set_acceptor_fd(i, -1);
+        } else {
             FD_SET(fd_temp, &acceptor_set);
             fd_max = max(fd_max, fd_temp);
             fds.push_back(fd_temp);
@@ -105,8 +111,8 @@ void Scout::GetAcceptorFdSet(fd_set& acceptor_set, vector<int>& fds, int& fd_max
 
 void Scout::Unicast(const string &type, const string& msg)
 {
-    int serv_id = get_leader_fd(S->get_pid());
-    if (send(get_leader_fd(S->get_pid()), msg.c_str(), msg.size(), 0) == -1) {
+    int serv_fd = get_leader_fd(S->get_pid());
+    if (send(serv_fd, msg.c_str(), msg.size(), 0) == -1) {
         D(cout << "SS" << S->get_pid() << ": ERROR in sending " << type << endl;)
     }
     else {

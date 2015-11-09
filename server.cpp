@@ -430,6 +430,7 @@ void Server::AllClearPhase()
     string message = kAllClearDone + kInternalDelim + kMessageDelim;
     if (get_master_fd() == -1)
     {
+        D(cout << "S" << get_pid() << " : ERROR: Master fd = -1" <<  endl;)
         return;
     }
     if (send(get_master_fd(), message.c_str(), message.size(), 0) == -1) {

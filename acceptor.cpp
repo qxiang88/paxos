@@ -239,7 +239,6 @@ void Acceptor::AcceptorMode(const int primary_id)
                     } else if (num_bytes == 0) {     //connection closed
                         D(cout << "SA" << S->get_pid() << ": Connection closed by scout or commander." << endl;)
                         if (i == get_scout_fd(primary_id)) {
-                            cout << "Scout" << endl;
                             close(fds[i]);
                             set_scout_fd(primary_id, -1);
                         } else {

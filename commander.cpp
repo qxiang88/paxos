@@ -77,7 +77,7 @@ void Commander::SendToServers(const string& type, const string& msg)
 {
     for (int i = 0; i < S->get_num_servers(); i++)
     {
-        if(get_replica_fd(i) == -1)
+        if (get_replica_fd(i) == -1)
             continue;
 
         if (send(get_replica_fd(i), msg.c_str(), msg.size(), 0) == -1) {
@@ -101,7 +101,7 @@ void Commander::SendP2a(const Triple &t, const vector<int> &acceptor_peer_fd)
         S->ContinueOrDie();
 
         serv_fd = get_acceptor_fd(i);
-        
+
         if (serv_fd == -1) {
             continue;
         }
@@ -188,9 +188,16 @@ void Commander::GetAcceptorFdSet(fd_set& acceptor_set, vector<int>& fds, int& fd
         fd_temp = get_acceptor_fd(i);
         if (fd_temp != -1)
         {
-            FD_SET(fd_temp, &acceptor_set);
-            fd_max = max(fd_max, fd_temp);
-            fds.push_back(fd_temp);
+            char buf;
+            int rv = recv(fd_temp, &buf, 1, MSG_DONTWAIT | MSG_PEEK);
+            if (rv == 0) {
+                close(fd_temp);
+                set_acceptor_fd(i, -1);
+            } else {
+                FD_SET(fd_temp, &acceptor_set);
+                fd_max = max(fd_max, fd_temp);
+                fds.push_back(fd_temp);
+            }
         }
     }
 }
@@ -198,7 +205,7 @@ void Commander::GetAcceptorFdSet(fd_set& acceptor_set, vector<int>& fds, int& fd
 /**
  * close all connections with acceptors before exiting
  */
- void Commander::CloseAllConnections() {
+void Commander::CloseAllConnections() {
     int acceptor_fd;
     for (int i = 0; i < S->get_num_servers(); ++i) {
         acceptor_fd = get_acceptor_fd(i);
@@ -210,9 +217,9 @@ void Commander::GetAcceptorFdSet(fd_set& acceptor_set, vector<int>& fds, int& fd
 
 int Commander::GetAcceptorIdFromFd(int fd)
 {
-    for(int i=0;i<S->get_num_servers();i++)
+    for (int i = 0; i < S->get_num_servers(); i++)
     {
-        if(get_acceptor_fd(i)==fd)
+        if (get_acceptor_fd(i) == fd)
             return i;
     }
 
@@ -220,7 +227,7 @@ int Commander::GetAcceptorIdFromFd(int fd)
 
 void* CommanderMode(void* _rcv_thread_arg) {
     signal(SIGPIPE, SIG_IGN);
-    
+
     CommanderThreadArgument *rcv_thread_arg = (CommanderThreadArgument *)_rcv_thread_arg;
     Commander *C = rcv_thread_arg->C;
     Triple toSend = rcv_thread_arg->toSend;
@@ -228,14 +235,14 @@ void* CommanderMode(void* _rcv_thread_arg) {
 
     std::vector<int> acceptor_peer_fd(num_servers, -1);
     int num_alive_acceptors = C->ConnectToAllAcceptors(acceptor_peer_fd);
-    
+
     if ((float)num_alive_acceptors < (num_servers / 2.0)) {
         // won't send P2a to anyone since only a minority is alive
         D(cout << "SC" << C->S->get_pid()
           << ": Exiting because only minority of acceptors are alive" << endl;)
         usleep(kMinoritySleep);
 
-        Triple no_op(toSend.b, toSend.s, Proposal(to_string(0),to_string(0),kNoop));
+        Triple no_op(toSend.b, toSend.s, Proposal(to_string(0), to_string(0), kNoop));
         C->SendDecision(no_op);
         return NULL;
     }
@@ -257,7 +264,7 @@ void* CommanderMode(void* _rcv_thread_arg) {
 
             usleep(kMinoritySleep);
 
-            Triple no_op(toSend.b, toSend.s, Proposal(to_string(0),to_string(0),kNoop));
+            Triple no_op(toSend.b, toSend.s, Proposal(to_string(0), to_string(0), kNoop));
             C->SendDecision(no_op);
             return NULL;
         }
@@ -289,7 +296,7 @@ void* CommanderMode(void* _rcv_thread_arg) {
 
                             if (token[0] == kP2b) {
                                 D(cout << "SC" << C->S->get_pid()
-                                    << ": P2b message received from acceptor S" << serv_id << ": " << msg <<  endl;)
+                                  << ": P2b message received from acceptor S" << serv_id << ": " << msg <<  endl;)
 
                                 // close connection with this acceptor
                                 // because no future communication with it will happen

@@ -99,10 +99,10 @@ void Leader::GetFdSet(fd_set& recv_from_set, int& fd_max, std::vector<int> &fds)
     int fd_temp;
     FD_ZERO(&recv_from_set);
 
-    fd_temp = get_replica_fd(S->get_pid());
-    FD_SET(fd_temp, &recv_from_set);
-    fd_max = max(fd_max, fd_temp);
-    fds.push_back(fd_temp);
+    // fd_temp = get_replica_fd(S->get_pid());
+    // FD_SET(fd_temp, &recv_from_set);
+    // fd_max = max(fd_max, fd_temp);
+    // fds.push_back(fd_temp);
 
     fd_temp = get_scout_fd(S->get_pid());
     FD_SET(fd_temp, &recv_from_set);
@@ -113,6 +113,24 @@ void Leader::GetFdSet(fd_set& recv_from_set, int& fd_max, std::vector<int> &fds)
     FD_SET(fd_temp, &recv_from_set);
     fd_max = max(fd_max, fd_temp);
     fds.push_back(fd_temp);
+
+    for (int i = 0; i < S->get_num_servers(); ++i)
+    {
+        fd_temp = get_replica_fd(i);
+        if(get_replica_fd(i) == -1)
+            continue;
+
+        char buf;
+        int rv = recv(fd_temp, &buf, 1, MSG_DONTWAIT | MSG_PEEK);
+        if (rv == 0) {
+            close(fd_temp);
+            set_replica_fd(i, -1);
+        } else {
+            FD_SET(fd_temp, &recv_from_set);
+            fd_max = max(fd_max, fd_temp);
+            fds.push_back(fd_temp);
+        }
+    }
 }
 
 void Leader::SendReplicasAllDecisions()

@@ -866,7 +866,7 @@ int main() {
     M.ReadTest();
 
     usleep(18000 * 1000);
-    cout << "M  : GOODBYE. Killing everyone..." << endl;
+    D(cout << "M  : GOODBYE. Killing everyone..." << endl;)
     M.KillAllServers();
     M.KillAllClients();
     return 0;
