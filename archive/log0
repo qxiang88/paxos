@@ -1,34 +1,57 @@
+1
 0 0: first
 1 0: second
 2 0: third
 3 1: fourth
 4 1: fifth
 -------------
+2
 0 0: first
 1 0: second
 2 1: third
 3 0: forth
 -------------
+3
 0 0: first
 1 0: second
 2 1: third
 3 0: forth
 4 1: fifth
 -------------
+4
 0 0: first
 1 0: second
 -------------
+5
 0 0: first
 1 1: third
 2 0: second
 -------------
+6
 0 0: first
 1 1: second
-2 0: forth
-3 0: third
+2 0: third
+3 0: forth
 -------------
+7
 0 0: first
 1 1: second
 -------------
-0 0: first
+8
+
 -------------
+9
+0 0: first
+1 0: second
+-------------
+10
+
+-------------
+11
+0 0: first
+1 0: second
+-------------
+12
+0 0: first
+1 0: second
+

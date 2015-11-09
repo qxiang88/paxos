@@ -26,6 +26,9 @@ using namespace std;
 #  define D(x)
 #endif // DEBUG
 
+#define WAIT true
+#define NORMAL false
+
 extern char **environ;
 pthread_mutex_t primary_id_lock;
 pthread_mutex_t proceed_lock;
@@ -237,12 +240,13 @@ void Master::SetCloseExecFlag(const int fd) {
         if (keyword == kCrashServer) {
             int server_id;
             iss >> server_id;
-            set_proceed(false);
+            // set_proceed(false);
+            set_proceed(WAIT);
             CrashServer(server_id);
-            while (get_proceed() == false) {
+            while (get_proceed() == WAIT) {
                 usleep(kBusyWaitSleep);
             }
-            set_proceed(false);
+            // set_proceed(NORMAL);
 
             // if (server_id == get_primary_id()) {
             //     NewPrimaryElection();
@@ -264,6 +268,13 @@ void Master::SetCloseExecFlag(const int fd) {
             usleep(kGeneralSleep);
             usleep(kGeneralSleep);//to give time for client to resend chat if needed
             usleep(kGeneralSleep);
+
+            // set_proceed(WAIT);
+            while (get_proceed() == WAIT) {
+                usleep(kBusyWaitSleep);
+            }
+            // set_proceed(NORMAL);
+
             SendAllClearToServers(kAllClear); //sends to primary server
             WaitForAllClearDone();
             SendAllClearToServers(kAllClearRemove); //sends to primary server
@@ -272,8 +283,7 @@ void Master::SetCloseExecFlag(const int fd) {
             int num_messages;
             iss >> num_messages;
             TimeBombLeader(num_messages);
-            usleep(kGeneralSleep);
-            usleep(kGeneralSleep);
+            WaitForGoAhead(get_primary_id());
         }
         if (keyword == kPrintChatLog) {
             int client_id;
@@ -451,9 +461,6 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
  void Master::NewPrimaryElection() {
     ElectNewPrimary();
     InformServersAboutNewPrimary();
-    usleep(kGeneralSleep);
-    usleep(kGeneralSleep);
-    InformClientsAboutNewPrimary();
 }
 
 /**
@@ -556,7 +563,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
         fout_[i].open(kChatLogFile + to_string(i), ios::app);
     }
 
-    set_proceed(false);
+    set_proceed(NORMAL);
 }
 
 /**
@@ -639,11 +646,11 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
         NULL
     };
     status = posix_spawn(&pid,
-     (char*)kServerExecutable.c_str(),
-     NULL,
-     NULL,
-     argv,
-     environ);
+       (char*)kServerExecutable.c_str(),
+       NULL,
+       NULL,
+       argv,
+       environ);
     if (status == 0) {
         D(cout << "M  : Spawned server S" << server_id << endl;)
         set_server_pid(server_id, pid);
@@ -677,11 +684,11 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
             NULL
         };
         status = posix_spawn(&pid,
-         (char*)kClientExecutable.c_str(),
-         NULL,
-         NULL,
-         argv,
-         environ);
+           (char*)kClientExecutable.c_str(),
+           NULL,
+           NULL,
+           argv,
+           environ);
         if (status == 0) {
             D(cout << "M  : Spawned client C" << i << endl;)
             set_client_pid(i, pid);
@@ -839,6 +846,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
                 if (FD_ISSET(fds[i], &server_set)) { // we got one!!
                     num_bytes = recv(M->get_server_fd(serv_id), &buf, 1, MSG_DONTWAIT | MSG_PEEK);
                     if (num_bytes == 0) {  // connection closed by server
+                        M->set_proceed(WAIT);
                         if (serv_id == M->get_primary_id()) {
                             // if a primary dies, it might have been because of timeBombLeader
                             // master might not have closed and reset its fd/pid/status yet
@@ -849,6 +857,7 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
 
                             M->NewPrimaryElection();
                             M->WaitForGoAhead(M->get_primary_id());
+                            M->InformClientsAboutNewPrimary();
                         } else {
                             // if a non-primary dies, master must have called crashServer on it
                             // no need to close and set fd/status/pid again.
@@ -856,8 +865,8 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
                             M->set_server_fd(serv_id, -1);
                             M->set_server_status(serv_id, DEAD);
                         }
-
-                        M->set_proceed(true);
+                        M->set_proceed(NORMAL);
+                        // M->set_proceed(true);
                     } else {
                         // some valid activity detected. Ignore
                     }

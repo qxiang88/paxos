@@ -542,6 +542,7 @@ void* ReceiveMessagesFromMaster(void* _S ) {
                 } else if (token[0] == kTimeBomb) {
                     D(cout << "S" << S->get_pid() << " : Received TimeBomb " << token[1] << endl;)
                     S->set_message_quota(stoi(token[1]));
+                    S->SendGoAheadToMaster();
                 } else {    //other messages
                     D(cout << "S" << S->get_pid() << " : ERROR Unexpected message received from M" << endl;)
                 }

@@ -1,0 +1,9 @@
+start 3 3
+timeBombLeader 7
+sendMessage 1 first
+sendMessage 1 second
+allClear
+printChatLog 0
+printChatLog 1
+printChatLog 2
+#anyone can decide first because of lack of all clear. but both will be decided

@@ -7,4 +7,4 @@ allClear
 printChatLog 0
 printChatLog 1
 printChatLog 2
-#1st decided. 2nd midway crash at p1a. client resends and new primary decides second.
+#first decided. first primary for second msg midway crash at p1a. new primary. client resends and 1 decides second.

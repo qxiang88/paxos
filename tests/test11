@@ -1,11 +1,10 @@
 start 3 3
-timeBombLeader 2
-sendMessage 0 first
+timeBombLeader 7
+sendMessage 1 first
 allClear
-timeBombLeader 2
 sendMessage 1 second
 allClear
 printChatLog 0
 printChatLog 1
 printChatLog 2
-#no decision
+#0 decides first but 1 decides second
