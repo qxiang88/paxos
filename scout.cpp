@@ -16,7 +16,7 @@ using namespace std;
 
 typedef pair<int, Proposal> SPtuple;
 
-// #define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
 #  define D(x) x

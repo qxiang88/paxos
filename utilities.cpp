@@ -1,6 +1,6 @@
 #include "utilities.h"
 
-// #define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
 #  define D(x) x

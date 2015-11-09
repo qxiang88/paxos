@@ -18,7 +18,7 @@
 #include "pthread.h"
 using namespace std;
 
-// #define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
 #  define D(x) x
@@ -539,10 +539,10 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
     std::vector<string> chat = split(chat_log, kInternalSetDelim[0]);
     for (auto &c : chat) {
         std::vector<string> token = split(c, kInternalStructDelim[0]);
-        // fout_[client_id]<<token[0]<<" "<<token[1]<<": "<<token[2]<<endl;
-        cout << token[0] << " " << token[1] << ": " << token[2] << endl;
+        fout_[client_id]<<token[0]<<" "<<token[1]<<": "<<token[2]<<endl;
+        // cout << token[0] << " " << token[1] << ": " << token[2] << endl;
     }
-    // fout_[client_id] << "-------------" << endl;
+    fout_[client_id] << "-------------" << endl;
 }
 
 /**
