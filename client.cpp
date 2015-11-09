@@ -75,18 +75,18 @@ int Client::set_primary_id(const int primary_id) {
 /**
  * @return size of chat list
  */
-size_t Client::ChatListSize() {
+ size_t Client::ChatListSize() {
     return chat_list_.size();
 }
 /**
  * reads ports-file and populates port related vectors/maps
  * @return true is ports-file was read successfully
  */
-bool Client::ReadPortsFile() {
+ bool Client::ReadPortsFile() {
     ifstream fin;
     fin.exceptions ( ifstream::failbit | ifstream::badbit );
     try {
-        fin.open(kPortsFile.c_str());
+        fin.open((kPortsFile+to_string(num_clients_)).c_str());
         fin >> master_port_;
 
         int port;
@@ -124,9 +124,9 @@ bool Client::ReadPortsFile() {
  * @param  num_servers number of servers
  * @param  num_clients number of clients
  */
-void Client::Initialize(const int pid,
-                        const int num_servers,
-                        const int num_clients) {
+ void Client::Initialize(const int pid,
+    const int num_servers,
+    const int num_clients) {
     set_pid(pid);
     set_primary_id(0);
     num_servers_ = num_servers;
@@ -139,11 +139,11 @@ void Client::Initialize(const int pid,
  * @param chat_id      id of the chat message
  * @param chat_message body of chat message
  */
-void Client::SendChatToPrimary(const int chat_id, const string &chat_message) {
+ void Client::SendChatToPrimary(const int chat_id, const string &chat_message) {
     string msg = kChat + kInternalDelim +
-                 to_string(get_pid()) + kInternalStructDelim +
-                 to_string(chat_id) + kInternalStructDelim +
-                 chat_message + kMessageDelim;
+    to_string(get_pid()) + kInternalStructDelim +
+    to_string(chat_id) + kInternalStructDelim +
+    chat_message + kMessageDelim;
     int primary_id = get_primary_id();
     if (send(get_primary_fd(), msg.c_str(), msg.size(), 0) == -1) {
         D(cout << "C" << get_pid() << " : ERROR: Cannot send chat message to primary S"
@@ -157,7 +157,7 @@ void Client::SendChatToPrimary(const int chat_id, const string &chat_message) {
 /**
  * sends all chats which have not yet been decided to the (new) primary
  */
-void Client::ResendChats() {
+ void Client::ResendChats() {
     for (int i = 0; i < chat_list_.size(); ++i) {
         if (decided_chat_ids_.find(i) == decided_chat_ids_.end()) {
             SendChatToPrimary(i, chat_list_[i]);
@@ -169,7 +169,7 @@ void Client::ResendChats() {
  * adds a new chat to the chat list
  * @param chat new chat to be added to the list
  */
-void Client::AddChatToChatList(const string &chat) {
+ void Client::AddChatToChatList(const string &chat) {
     chat_list_.push_back(chat);
 }
 
@@ -177,7 +177,7 @@ void Client::AddChatToChatList(const string &chat) {
  * adds a decided chat id to the decided_chat_ids list
  * @param chat_id chat id to be added
  */
-void Client::AddToDecidedChatIDs(const int chat_id) {
+ void Client::AddToDecidedChatIDs(const int chat_id) {
     decided_chat_ids_.insert(chat_id);
 }
 
@@ -187,9 +187,9 @@ void Client::AddToDecidedChatIDs(const int chat_id) {
  * @param sender_index id of original sender of chat message
  * @param body         chat message body
  */
-void Client::AddToFinalChatLog(const string &sequence_num,
-                               const string &sender_index,
-                               const string &body) {
+ void Client::AddToFinalChatLog(const string &sequence_num,
+   const string &sender_index,
+   const string &body) {
     int seq_num = stoi(sequence_num);
 
     pthread_mutex_lock(&final_chat_log_lock);
@@ -206,42 +206,41 @@ void Client::AddToFinalChatLog(const string &sequence_num,
  * acquires the final_chat_log_lock while constructing the message
  * @param msg [out] constructed chat log message
  */
-void Client::ConstructChatLogMessage(string &msg) {
+ void Client::ConstructChatLogMessage(string &msg) {
     pthread_mutex_lock(&final_chat_log_lock);
 
-    msg = "";
+    msg = kChatLog;
     int i = 0;
     for (auto const &c : final_chat_log_) {
         msg += to_string(i) + kInternalDelim
-               + c.second.sender_index + kInternalDelim
-               + c.second.body + kMessageDelim;
+        + c.second.sender_index + kInternalDelim
+        + c.second.body + kInternalSetDelim;
 
         i++;
     }
-
+    msg+=kMessageDelim;
     pthread_mutex_unlock(&final_chat_log_lock);
 }
 
 /**
  * sends final chat log to the master
  */
-void Client::SendChatLogToMaster() {
+ void Client::SendChatLogToMaster() {
     string chat_log_message;
     ConstructChatLogMessage(chat_log_message);
-
     if (send(get_master_fd(), chat_log_message.c_str(),
-             chat_log_message.size(), 0) == -1) {
+     chat_log_message.size(), 0) == -1) {
         D(cout << "C" << get_pid() << " : ERROR: Cannot send ChatLog M" << endl;)
-    } else {
-        D(cout << "C" << get_pid() << " : ChatLog sent to M" << endl;)
-    }
+} else {
+    D(cout << "C" << get_pid() << " : ChatLog sent to M" << endl;)
+}
 }
 
 /**
  * handles new primary related tasks, like connecting to new primary
  * and resending undecided chats to new primary
  */
-void Client::HandleNewPrimary(const int new_primary) {
+ void Client::HandleNewPrimary(const int new_primary) {
     set_primary_id(new_primary);
 
     if (ConnectToPrimary()) {
@@ -249,13 +248,16 @@ void Client::HandleNewPrimary(const int new_primary) {
     } else {
         D(cout << "C" << get_pid() << " : ERROR in connecting to primary S" << get_primary_id() << endl;)
     }
+    usleep(kGeneralSleep);
+    usleep(kGeneralSleep);
+    usleep(kGeneralSleep);
     ResendChats();
 }
 
 /**
  * Initialize all mutex locks
  */
-void Client::InitializeLocks() {
+ void Client::InitializeLocks() {
     if (pthread_mutex_init(&final_chat_log_lock, NULL) != 0) {
         D(cout << "C" << get_pid() << " : Mutex init failed" << endl;)
         pthread_exit(NULL);
@@ -266,7 +268,7 @@ void Client::InitializeLocks() {
  * function for client's receive messages from master thread
  * @param _C object of Client class
  */
-void* ReceiveMessagesFromMaster(void* _C) {
+ void* ReceiveMessagesFromMaster(void* _C) {
     Client* C = (Client*)_C;
     char buf[kMaxDataSize];
     int num_bytes;
@@ -316,7 +318,7 @@ void* ReceiveMessagesFromMaster(void* _C) {
  * and not remain stuck in recv waiting from an old dead primary
  * @param _C object of Client class
  */
-void* ReceiveMessagesFromPrimary(void* _C) {
+ void* ReceiveMessagesFromPrimary(void* _C) {
     Client* C = (Client*)_C;
     char buf[kMaxDataSize];
     int num_bytes;
@@ -348,7 +350,7 @@ void* ReceiveMessagesFromPrimary(void* _C) {
                     // token[1] = sequence number of chat as assigned by Paxos
                     // token[2] = proposal
                     std::vector<string> proposal_token =
-                        split(string(token[2]), kInternalStructDelim[0]);
+                    split(string(token[2]), kInternalStructDelim[0]);
                     // proposal_token[0] = (client id) id of original sender of chat message
                     // proposal_token[1] = (chat id) wrt to original sender of chat message
                     // proposal_token[2] = (msg) chat message body

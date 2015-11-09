@@ -1,0 +1,13 @@
+start 5 5
+sendMessage 0 first
+sendMessage 1 second
+sendMessage 2 third
+sendMessage 2 fourth
+sendMessage 0 fifth
+allClear
+printChatLog 0
+printChatLog 1
+printChatLog 2
+printChatLog 3
+printChatLog 4
+#normal case with 5 servers and clients

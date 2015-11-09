@@ -219,9 +219,10 @@ void Acceptor::AcceptorMode(const int primary_id)
         struct timeval timeout = kSelectTimeoutTimeval;
         rv = select(fd_max + 1, &recv_from, NULL, NULL, &timeout);
 
-        if (rv == -1) { //error in select
-            D(cout << "SA" << S->get_pid() << ": ERROR in select() for Acceptor errno=" << errno << "fd_max=" << fd_max << endl;)
-        } else if (rv == 0) {
+        // if (rv == -1) { //error in select
+        //     D(cout << "SA" << S->get_pid() << ": ERROR in select() for Acceptor errno=" << errno << "fd_max=" << fd_max << endl;)
+        // } else 
+        if (rv == 0) {
             // D(cout << "SA" << S->get_pid() << ": Unexpected select timeout in Acceptor" << endl;)
         } else {
             for (int i = 0; i < fds.size(); i++) {

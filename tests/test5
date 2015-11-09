@@ -12,3 +12,4 @@ allClear
 printChatLog 0
 printChatLog 1
 printChatLog 2
+#minority. then restart and crash. change of primary. then buffer as minority. then restart. all 3 decided

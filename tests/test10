@@ -1,11 +1,10 @@
 start 3 3
 timeBombLeader 2
 sendMessage 0 first
-allClear
 timeBombLeader 2
 sendMessage 1 second
 allClear
 printChatLog 0
 printChatLog 1
 printChatLog 2
-#change primary. client resends. again change primary. client resends. only one decided
+#no one decides anything, as both leaders crash timebomb. minority.

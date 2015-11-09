@@ -230,7 +230,7 @@ void Server::set_message_quota(const int num_messages) {
  * @return      id of client whose chat port matches param port
  * @return      -1 if param port is not the chat port of any client
  */
-int Server::IsClientChatPort(const int port) {
+ int Server::IsClientChatPort(const int port) {
     if (client_chat_port_map_.find(port) != client_chat_port_map_.end()) {
         return client_chat_port_map_[port];
     } else {
@@ -244,7 +244,7 @@ int Server::IsClientChatPort(const int port) {
  * @return      id of server whose replica port matches param port
  * @return      -1 if param port is not the replica port of any server
  */
-int Server::IsReplicaPort(const int port) {
+ int Server::IsReplicaPort(const int port) {
     if (replica_port_map_.find(port) != replica_port_map_.end()) {
         return replica_port_map_[port];
     } else {
@@ -258,7 +258,7 @@ int Server::IsReplicaPort(const int port) {
  * @return      id of server whose leader port matches param port
  * @return      -1 if param port is not the leader port of any server
  */
-int Server::IsLeaderPort(const int port) {
+ int Server::IsLeaderPort(const int port) {
     if (leader_port_map_.find(port) != leader_port_map_.end()) {
         return leader_port_map_[port];
     } else {
@@ -272,7 +272,7 @@ int Server::IsLeaderPort(const int port) {
  * @return      id of server whose acceptor port matches param port
  * @return      -1 if param port is not the acceptor port of any server
  */
-int Server::IsAcceptorPort(const int port) {
+ int Server::IsAcceptorPort(const int port) {
     if (acceptor_port_map_.find(port) != acceptor_port_map_.end()) {
         return acceptor_port_map_[port];
     } else {
@@ -284,11 +284,11 @@ int Server::IsAcceptorPort(const int port) {
  * reads ports-file and populates port related vectors/maps
  * @return true is ports-file was read successfully
  */
-bool Server::ReadPortsFile() {
+ bool Server::ReadPortsFile() {
     ifstream fin;
     fin.exceptions ( ifstream::failbit | ifstream::badbit );
     try {
-        fin.open(kPortsFile.c_str());
+        fin.open((kPortsFile+to_string(get_num_servers())).c_str());
         fin >> master_port_;
         int port;
         for (int i = 0; i < num_clients_; i++) {
@@ -346,11 +346,11 @@ bool Server::ReadPortsFile() {
  * @param  num_servers number of servers
  * @param  num_clients number of clients
  */
-void Server::Initialize(const int pid,
-                        const int num_servers,
-                        const int num_clients,
-                        int mode,
-                        int primary_id) {
+ void Server::Initialize(const int pid,
+    const int num_servers,
+    const int num_clients,
+    int mode,
+    int primary_id) {
     set_pid(pid);
     set_primary_id(primary_id);
     num_servers_ = num_servers;
@@ -399,7 +399,7 @@ void Server::Initialize(const int pid,
 /**
  * creates accept thread for commander
  */
-void Server::CommanderAcceptThread(Commander* C) {
+ void Server::CommanderAcceptThread(Commander* C) {
     pthread_t accept_connections_thread;
     CreateThread(AcceptConnectionsCommander, (void*)C, accept_connections_thread);
 }
@@ -407,7 +407,7 @@ void Server::CommanderAcceptThread(Commander* C) {
 /**
  * creates accept thread for scout
  */
-void Server::ScoutAcceptThread(Scout* SC) {
+ void Server::ScoutAcceptThread(Scout* SC) {
     pthread_t accept_connections_thread;
     CreateThread(AcceptConnectionsScout, (void*)SC, accept_connections_thread);
 }
@@ -451,7 +451,7 @@ void Server::FinishAllClear()
  * handles functions to be executed on receipt of new primary
  * @param new_primary_id id of the new primary elected
  */
-void Server::HandleNewPrimary(const int new_primary_id) {
+ void Server::HandleNewPrimary(const int new_primary_id) {
     set_primary_id(new_primary_id);
 
     if (get_pid() != get_primary_id())
@@ -479,7 +479,7 @@ void Server::HandleNewPrimary(const int new_primary_id) {
 /**
  * sends GoAhead message to master
  */
-void Server::SendGoAheadToMaster() {
+ void Server::SendGoAheadToMaster() {
     string message = kGoAhead + kInternalDelim + kMessageDelim;
     if (send(get_master_fd(), message.c_str(), message.size(), 0) == -1) {
         D(cout << "S" << get_pid() << " : ERROR: Cannot send GOAHEAD done to master" <<  endl;)
@@ -499,7 +499,7 @@ void Server::Die() {
  * it the message quota has been exhausted, then it sends a KillMe message to master
  * it sleeps after sending KillMe to master, untill the master kills the process
  */
-void Server::ContinueOrDie() {
+ void Server::ContinueOrDie() {
     if (get_message_quota() <= 0) {
         Die();
     }
@@ -509,7 +509,7 @@ void Server::ContinueOrDie() {
  * decrements the message quota by 1
  * after decrementing, it checks whether or not has it exhausted its message quota
  */
-void Server::DecrementMessageQuota() {
+ void Server::DecrementMessageQuota() {
     set_message_quota(get_message_quota() - 1);
     ContinueOrDie();
 }
