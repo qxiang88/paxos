@@ -86,7 +86,7 @@ void Leader::set_leader_active(const bool b) {
 /**
  * increments the value of ballot_num_
  */
-void Leader::IncrementBallotNum() {
+ void Leader::IncrementBallotNum() {
     Ballot b = get_ballot_num();
     b.seq_num++;
     set_ballot_num(b);
@@ -163,7 +163,7 @@ void Leader::SendReplicasAllDecisions()
  * @param  _S pointer to server class object
  * @return    NULL
  */
-void* LeaderEntry(void *_S) {
+ void* LeaderEntry(void *_S) {
     signal(SIGPIPE, SIG_IGN);
 
     Leader L((Server*)_S);
@@ -220,8 +220,8 @@ void* LeaderEntry(void *_S) {
 /**
  * function for performing leader related job
  */
-void Leader::LeaderMode()
-{
+ void Leader::LeaderMode()
+ {
     // scout
     pthread_t scout_thread;
     ScoutThreadArgument* arg = new ScoutThreadArgument;
@@ -229,7 +229,7 @@ void Leader::LeaderMode()
     arg->ball = get_ballot_num();
     arg->sleep_time = 0;
     CreateThread(ScoutMode, (void*)arg, scout_thread);
-
+    bool scout_active = true;
     int num_servers = S->get_num_servers();
     vector<int> fds;
     while (true) {
@@ -298,7 +298,7 @@ void Leader::LeaderMode()
                             else if (token[0] == kAdopted)
                             {
                                 D(cout << "SL" << S->get_pid() << ": Adopted message received: " << msg <<  endl;)
-
+                                scout_active = false;
                                 unordered_set<Triple> pvalues;
                                 if (token.size() == 3)
                                 {
@@ -336,6 +336,7 @@ void Leader::LeaderMode()
                                     arg->ball = get_ballot_num();
                                     arg->sleep_time = 0;
                                     CreateThread(ScoutMode, (void*)arg, scout_thread);
+                                    scout_active = true;
                                 }
                                 else if (recvd_b == get_ballot_num())    // minority of acceptors alive
                                 {
@@ -346,6 +347,7 @@ void Leader::LeaderMode()
                                     arg->ball = get_ballot_num();
                                     arg->sleep_time = kMinoritySleep;
                                     CreateThread(ScoutMode, (void*)arg, scout_thread);
+                                    scout_active = true;
                                 }
                             }
                             else if (token[0] == kDecision)
@@ -369,7 +371,7 @@ void Leader::LeaderMode()
             //means all done. just waiting for all clear to be lifted
             usleep(kAllClearSleep);
         }
-        while ((commanders_.empty()) && (S->get_all_clear(kLeaderRole) == kAllClearSet))
+        while ((commanders_.empty()) && (S->get_all_clear(kLeaderRole) == kAllClearSet) && !scout_active)
         {
             SendReplicasAllDecisions();
             S->set_all_clear(kLeaderRole, kAllClearDone);

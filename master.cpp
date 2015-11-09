@@ -235,7 +235,7 @@ void Master::SetCloseExecFlag(const int fd) {
             ConstructChatMessage(chat_message, message);
             SendMessageToClient(client_id, message);
             usleep(kGeneralSleep);
-            // usleep(kGeneralSleep);
+            usleep(kGeneralSleep);
         }
         if (keyword == kCrashServer) {
             int server_id;
@@ -649,11 +649,11 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
         NULL
     };
     status = posix_spawn(&pid,
-       (char*)kServerExecutable.c_str(),
-       NULL,
-       NULL,
-       argv,
-       environ);
+     (char*)kServerExecutable.c_str(),
+     NULL,
+     NULL,
+     argv,
+     environ);
     if (status == 0) {
         D(cout << "M  : Spawned server S" << server_id << endl;)
         set_server_pid(server_id, pid);
@@ -687,11 +687,11 @@ void Master::GetServerFdSet(fd_set& server_fd_set, vector<int>& server_fd_vec, i
             NULL
         };
         status = posix_spawn(&pid,
-           (char*)kClientExecutable.c_str(),
-           NULL,
-           NULL,
-           argv,
-           environ);
+         (char*)kClientExecutable.c_str(),
+         NULL,
+         NULL,
+         argv,
+         environ);
         if (status == 0) {
             D(cout << "M  : Spawned client C" << i << endl;)
             set_client_pid(i, pid);
