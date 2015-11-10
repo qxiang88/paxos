@@ -247,6 +247,8 @@ int Client::set_primary_id(const int primary_id) {
     } else {
         D(cout << "C" << get_pid() << " : ERROR in connecting to primary S" << get_primary_id() << endl;)
     }
+    usleep(kGeneralSleep);
+    usleep(kGeneralSleep);
     ResendChats();
 }
 

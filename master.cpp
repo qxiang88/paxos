@@ -286,6 +286,8 @@ void Master::SetCloseExecFlag(const int fd) {
             WaitForGoAhead(get_primary_id());
         }
         if (keyword == kPrintChatLog) {
+            usleep(kGeneralSleep);
+            usleep(kGeneralSleep);
             int client_id;
             iss >> client_id;
             string message = kChatLog + kInternalDelim;
