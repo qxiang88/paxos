@@ -37,6 +37,9 @@ extern void *ReplicaEntry(void *_S);
 extern void *AcceptorEntry(void *_S);
 extern void *LeaderEntry(void *_S);
 
+Server::~Server() {
+
+}
 
 int Server::get_pid() {
     return pid_;

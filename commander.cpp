@@ -28,6 +28,10 @@ typedef pair<int, Proposal> SPtuple;
 std::vector<int> Commander::leader_fd_;
 std::vector<int> Commander::replica_fd_;
 
+Commander::~Commander() {
+
+}
+
 Commander::Commander(Server* _S, const int num_servers) {
     S = _S;
     leader_fd_.resize(num_servers, -1);

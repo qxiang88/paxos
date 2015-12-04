@@ -26,6 +26,10 @@ typedef pair<int, Proposal> SPtuple;
 
 extern void* AcceptConnectionsAcceptor(void* _S);
 
+Acceptor::~Acceptor() {
+
+}
+
 Acceptor::Acceptor(Server* _S) {
     S = _S;
     set_best_ballot_num(Ballot(INT_MIN, INT_MIN));

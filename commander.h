@@ -40,6 +40,7 @@ public:
     Commander(Server *_S, const int num_servers);
 
     Server *S;
+    ~Commander();
 
 private:
     static std::vector<int> leader_fd_;

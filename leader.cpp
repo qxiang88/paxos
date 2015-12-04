@@ -26,6 +26,9 @@ typedef pair<int, Proposal> SPtuple;
 
 extern void* CommanderMode(void* _rcv_thread_arg);
 
+Leader::~Leader() {
+
+}
 
 Leader::Leader(Server* _S) {
     S = _S;

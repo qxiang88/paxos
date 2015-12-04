@@ -78,6 +78,8 @@ public:
     void set_all_clear(string, string);
     void set_message_quota(const int num_messages);
 
+    ~Server();
+
 private:
     int pid_;   // server's ID
     int num_servers_;

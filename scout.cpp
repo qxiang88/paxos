@@ -26,6 +26,10 @@ typedef pair<int, Proposal> SPtuple;
 
 extern void* AcceptConnectionsScout(void* _S);
 
+Scout::~Scout() {
+
+}
+
 Scout::Scout(Server* _S) {
     S = _S;
 

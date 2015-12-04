@@ -37,6 +37,7 @@ public:
     Acceptor(Server *_S);
 
     Server *S;
+    ~Acceptor();
 private:
     Ballot best_ballot_num_;
     std::unordered_set<Triple> accepted_;

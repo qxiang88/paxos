@@ -35,6 +35,10 @@ bool map_compare(std::map<int, Proposal> &lhs, std::map<int, Proposal> &rhs) {
     return true;
 }
 
+Replica::~Replica() {
+
+}
+
 Replica::Replica(Server* _S) {
     S = _S;
     set_slot_num(0);

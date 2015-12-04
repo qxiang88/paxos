@@ -38,6 +38,7 @@ public:
     Scout(Server *_S);
 
     Server *S;
+    ~Scout();
 private:
     std::vector<int> leader_fd_;
     // std::vector<int> replica_fd_;
