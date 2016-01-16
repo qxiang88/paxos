@@ -29,4 +29,7 @@ Type `./master` to run the program
 Printing of debug statements can be turned off for each `.cpp` file by commenting the `#define DEBUG` statement at the beginning of that file.
 ### Note:
 1. Test file **must not** have a new line at the end
-2. Some long tests might take quite a lot of time to finish (~100 sec), especially those that have multiple crashes and restarts, because every restart operation requires 6-7 seconds for a server to start.
+2. Some long tests might take quite a lot of time to finish (~100 sec), especially those that uhave multiple crashes and restarts, because every restart operation requires 6-7 seconds for a server to start.
+
+### Issues:
+Double free corruption errors are still not fixed. We are pretty sure that it might be because of the pointer to Server class object in other classes, and the lack of explicit definition of copy constructors and assignment operators in them. We tried to circumvent this by adding an empty destructor in each class so that memory is never freed, but that does not seem to fix the issue (the design of our classes indeed requires shallow copying of the object pointed to by the Server class pointer; the object is shared between all classes with the aim of letting every class witness every modification to the Server class object. So, we argued that the shallow copying entailed by the copy constructor and assignment operator automatically added by the compiler indeed works fine). Our workaround did not fix the issue, though. It might be the case that the error is in some other part of code, although it seems unlikely.
